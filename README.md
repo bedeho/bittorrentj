@@ -1,7 +1,7 @@
 bittorrentj
 ===========
 
-A Java BitTorrent Library
+A BitTorrent client library in Java.
 
 Features
 --------
