@@ -36,7 +36,7 @@ public class BitTorrentj {
     /**
      * Thread managing client
      */
-    private ClientThread client;
+    private Client client;
 
     /**
      * Queue containing events which client thread has recently generated. It is
@@ -66,7 +66,7 @@ public class BitTorrentj {
 
         // Setup
         this.eventQueue = new LinkedList<Event>();
-        this.client = new ClientThread(this);
+        this.client = new Client(this);
 
         // Start client
         client.start();
@@ -158,19 +158,19 @@ public class BitTorrentj {
 
     }
 
-    public int getPort() {
+    int getPort() {
         return port;
     }
 
-    public int getMaxNumberOfConnections() {
+    int getMaxNumberOfConnections() {
         return maxNumberOfConnections;
     }
 
-    public ArrayList<Extension> getExtensions() {
+    ArrayList<Extension> getExtensions() {
         return extensions;
     }
 
-    public boolean isUseDHT() {
+    boolean isUseDHT() {
         return useDHT;
     }
 }
