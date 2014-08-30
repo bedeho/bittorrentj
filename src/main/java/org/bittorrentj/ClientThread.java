@@ -1,12 +1,8 @@
 package org.bittorrentj;
 
-/**
- * Created by bedeho on 30.08.2014.
- */
-
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Set;
+
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.SelectionKey;
@@ -15,11 +11,7 @@ import java.nio.ByteBuffer;
 import java.net.InetSocketAddress;
 import java.io.IOException;
 
-
-import org.bittorrentj.BitTorrentj;
-import org.bittorrentj.Torrent;
-
-import org.bittorrentj.util.InfoHash;
+import org.bittorrentj.event.Event;
 
 public class ClientThread extends Thread {
 
@@ -72,6 +64,7 @@ public class ClientThread extends Thread {
 
         } catch (IOException e) {
 
+            b.addEvent(new Event());
             // create some message which encodes that we could not start server
         }
 
