@@ -26,11 +26,6 @@ public class Client extends Thread {
     private HashMap<InfoHash, Torrent> torrents;
 
     /**
-     * Server side address
-     */
-    private InetSocketAddress address;
-
-    /**
      * Socket channel used for server
      */
     private ServerSocketChannel serverChannel;
@@ -40,14 +35,31 @@ public class Client extends Thread {
      */
     private Selector selector;
 
+    /**
+     * Map of channels which have not completed handshake step.
+     * The key is InetSocketAddress.toString() which has format host:port.
+     */
+    private HashMap<String, SocketChannel> channelsBeforeHandshake;
+
+    /**
+     *
+     * @param b
+     */
+
     Client(BitTorrentj b) {
 
         this.b = b;
         this.torrents = new HashMap<InfoHash, Torrent>();
-        this.address = new InetSocketAddress("localhost", b.getPort());
+
     }
 
+    /**
+     * Thread entry point where main client thread runs. It pools network selector and checks command queue
+     */
     public void run() {
+
+        // Create server side address
+        InetSocketAddress address =  new InetSocketAddress("localhost", b.getPort());
 
         // Start server
         try {
@@ -68,9 +80,7 @@ public class Client extends Thread {
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
         } catch (IOException e) {
-
             b.addEvent(new StartServerErrorEvent(e, address));
-            // create some message which encodes that we could not start server
         }
 
         // Event loop
@@ -93,15 +103,81 @@ public class Client extends Thread {
                 // Remove the current key
                 i.remove();
 
-                // if isAccetable = true, then a client required a connection
+                // Ready to accept new connection
                 if (key.isAcceptable()) {
 
+                    accept();
+
+                    continue ??
+
+                }
+
+                // if isReadable = true, then the server is ready to read
+                if (key.isReadable()) {
+
+                    read();
+
+                }
+
+                if(key.isWritable())
+                    write();
+            }
+
+            // LOOK AT MESSAGE WHICH MAY HAVE ARRIVED FROM BITTORRENTJ
+            // concurrentlist.size() > 0 --> something to do
+
+        }
+    }
+
+    /**
+     *
+     */
+    private void accept() {
+
+
+        // Check if we can accept one more connection
+        if(numberOfConnections() + 1 <= b.getMaxNumberOfConnections()) {
+
+            // Create event??
+            b.addEvent(new ToManyConnectionsErrorEvent());
+
+            // Continue processing next key
+            return;
+        }
+
+        // Get socket channel
+        SocketChannel client = serverChannel.accept();
+
+        // Setup Non Blocking I/O
+        client.configureBlocking(false);
+
+        // recording to the selector (reading)
+        client.register(selector, SelectionKey.OP_READ);
+
+        // Save channel
+        InetSocketAddress a;
+
+        try {
+            a = client.getRemoteAddress();
+
+            channelsBeforeHandshake.put(a.toString(), client);
+        } catch (IOException e) {
+
+        }
+
+        // Continue processing next key
 
                     /*
-                        can it have one more peer?
+                    wait for handshake message
+                    consume message up to and including info_hash
+                    do we serve info_hash it? if no: disconnect
+                    */
+
+                    /*
+
 
                         true:
-                            then send our own  handshake, set reserved bits to indicate we support
+                            then send our own handshake, set reserved bits to indicate we support
                             BEP 5 DHT
                             BEP 6 Fast extension
                             BEP 10
@@ -111,51 +187,52 @@ public class Client extends Thread {
                             disconnect
                      */
 
+    }
 
+    /**
+     *
+     * @param key
+     */
+    private void read(SelectionKey key) {
 
-                    // get client socket channel
-                    SocketChannel client = serverChannel.accept();
+        SocketChannel client = (SocketChannel) key.channel();
 
-                    // Non Blocking I/O
-                    client.configureBlocking(false);
-
-                    // recording to the selector (reading)
-                    client.register(selector, SelectionKey.OP_READ);
-
-                    continue;
-
-                    /*
-                    block accept an incoming connection if it does not put us over limit
-                    wait for handshake message
-                    consume message up to and including info_hash
-                    do we serve info_hash it? if no: disconnect
-                    */
-
-                }
-
-                // if isReadable = true, then the server is ready to read
-                if (key.isReadable()) {
-
-                    SocketChannel client = (SocketChannel) key.channel();
-
-                    // Read byte coming from the client
-                    int BUFFER_SIZE = 32;
-                    ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-                    try {
-                        client.read(buffer);
-                    }
-                    catch (Exception e) {
-                        // client is no longer active
-                        e.printStackTrace();
-                        continue;
-                    }
-
-                }
-            }
-
-            // LOOK AT MESSAGE WHICH MAY HAVE ARRIVED FROM BITTORRENTJ
-            // concurrentlist.size() > 0 --> something to do
-
+        // Read byte coming from the client
+        int BUFFER_SIZE = 32;
+        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+        try {
+            client.read(buffer);
         }
+        catch (Exception e) {
+            // client is no longer active
+            e.printStackTrace();
+            continue;
+        }
+    }
+
+    /**
+     *
+     * @param key
+     */
+    private void write(SelectionKey key) {
+
+    }
+
+    /**
+     * Count the total number of accepted connections
+     * @return
+     */
+    private int numberOfConnections() {
+
+        int number = 0;
+
+        // Count the number of peers for each torrent
+        for(Torrent t: torrents)
+            number += t.getNumberOfPeers();
+
+        // Count the connections not yet having handshaked
+        number += channelsBeforeHandshake.size();
+
+        return number;
     }
 }
