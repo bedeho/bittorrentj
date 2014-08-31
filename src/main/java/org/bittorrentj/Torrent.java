@@ -1,9 +1,26 @@
 package org.bittorrentj;
 
+import java.util.HashMap;
+
+import org.bittorrentj.Connection;
+
 /**
  * Created by bedeho on 30.08.2014.
  */
 public class Torrent {
+
+
+    /**
+     * Map of channels which have not completed handshake step.
+     * The key is InetSocketAddress.toString() which has format host:port.
+     */
+    private HashMap<String, Connection> channelsBeforeHandshake;
+
+
+    
+    Torrent() {
+
+    }
 
     /**
      *

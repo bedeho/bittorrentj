@@ -58,35 +58,14 @@ public class Client extends Thread {
      */
     public void run() {
 
-        // Create server side address
-        InetSocketAddress address =  new InetSocketAddress("localhost", b.getPort());
-
-        // Start server
-        try {
-
-            // Create server channel
-            serverChannel = ServerSocketChannel.open();
-
-            // Try to listen to a given port
-            serverChannel.bind(address);
-
-            // Turn off blocking
-            serverChannel.configureBlocking(false);
-
-            // Create selector
-            selector = Selector.open();
-
-            // Recording server to selector (type OP_ACCEPT)
-            serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-
-        } catch (IOException e) {
-            b.addEvent(new StartServerErrorEvent(e, address));
-        }
+        // ALTER LATER TO SUPPORT INTERLEAVED BENINNING AND HALTING
+        if(!startServer())
+            return; // ?
 
         // Event loop
         while(true) {
 
-            // Block until socket event is generated
+            // Block until socket event is generated, or we are interreupted for some reason
             try {
                 selector.select();
             } catch() {
@@ -100,27 +79,20 @@ public class Client extends Thread {
 
                 SelectionKey key = (SelectionKey) i.next();
 
-                // Remove the current key
+                // Remove from selected key set <-- ? why needed
                 i.remove();
 
                 // Ready to accept new connection
-                if (key.isAcceptable()) {
-
+                if (key.isAcceptable())
                     accept();
 
-                    continue ??
+                // Ready to be read
+                if (key.isReadable())
+                    read(key);
 
-                }
-
-                // if isReadable = true, then the server is ready to read
-                if (key.isReadable()) {
-
-                    read();
-
-                }
-
+                // Ready to be written to
                 if(key.isWritable())
-                    write();
+                    write(key);
             }
 
             // LOOK AT MESSAGE WHICH MAY HAVE ARRIVED FROM BITTORRENTJ
@@ -132,8 +104,41 @@ public class Client extends Thread {
     /**
      *
      */
-    private void accept() {
+    private boolean startServer() {
 
+        // Create server side address
+        InetSocketAddress address = new InetSocketAddress("localhost", b.getPort());
+
+        // Create selector
+        selector = Selector.open();
+
+        // Start server
+        try {
+
+            // Create server channel
+            serverChannel = ServerSocketChannel.open();
+
+            // Try to listen to a given port
+            serverChannel.bind(address);
+
+            // Turn off blocking
+            serverChannel.configureBlocking(false);
+
+            // Recording server to selector (type OP_ACCEPT)
+            serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+
+        } catch (IOException e) {
+            b.addEvent(new StartServerErrorEvent(e, address)); // should we even have the address here?
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     *
+     */
+    private void accept() {
 
         // Check if we can accept one more connection
         if(numberOfConnections() + 1 <= b.getMaxNumberOfConnections()) {
@@ -148,7 +153,11 @@ public class Client extends Thread {
         // Get socket channel
         SocketChannel client = serverChannel.accept();
 
-        // Setup Non Blocking I/O
+        // Did we manage to actually accept connection? Why may this fail?
+        if(client == null)
+            return;
+
+        // Set to non-blocking mode
         client.configureBlocking(false);
 
         // recording to the selector (reading)
@@ -195,6 +204,12 @@ public class Client extends Thread {
      */
     private void read(SelectionKey key) {
 
+        // get the correct peer
+
+        // put data in input buffer
+
+        // call processing routine for peer
+
         SocketChannel client = (SocketChannel) key.channel();
 
         // Read byte coming from the client
@@ -215,6 +230,10 @@ public class Client extends Thread {
      * @param key
      */
     private void write(SelectionKey key) {
+
+        // grab the output buffer of the relevant peer
+
+        // write it out
 
     }
 

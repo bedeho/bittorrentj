@@ -3,8 +3,71 @@ package org.bittorrentj;
 /**
  * Created by bedeho on 30.08.2014.
  */
-public class Peer {
+public class Connection {
+
+    /**
+     * State of client side of connection
+     */
+    private PeerState clientState;
+
+    /**
+     * State of peer side of connection
+     */
+    private PeerState peerState;
+
+    /**
+     * Class capturing state of connection
+     */
+    private class PeerState {
+
+        /**
+         * Is in choking state
+         */
+        private boolean choking;
+
+        /**
+         * Is in choking interested
+         */
+        private boolean interested;
+
+        /**
+         * Constructor
+         * @param choking
+         * @param interested
+         */
+        PeerState(boolean choking, boolean interested) {
+            this.choking = choking;
+            this.interested = interested;
+        }
+
+        public boolean isChoking() {
+            return choking;
+        }
+
+        public void setChoking(boolean choking) {
+            this.choking = choking;
+        }
+
+        public boolean isInterested() {
+            return interested;
+        }
+
+        public void setInterested(boolean interested) {
+            this.interested = interested;
+        }
+    }
+
+    /*
+    public enum State {
+        BEFORE_HANDSHAKE(1),
+    }
+
+    public enum bufferState {
+
+    }
+    */
 }
+
 /*
 fields
         disk buffer?
