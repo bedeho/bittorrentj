@@ -10,7 +10,9 @@ import java.nio.channels.Selector;
 import java.nio.ByteBuffer;
 import java.net.InetSocketAddress;
 import java.io.IOException;
+import java.util.LinkedList;
 
+import org.bittorrentj.command.Command;
 import org.bittorrentj.event.StartServerErrorEvent;
 
 public class Client extends Thread {
@@ -42,15 +44,27 @@ public class Client extends Thread {
     private HashMap<String, SocketChannel> channelsBeforeHandshake;
 
     /**
-     *
-     * @param b
+     * Queue of commands issued by managing object b
+     */
+    private LinkedList<Command> commandQueue;
+
+    /**
+     * The number of milliseconds a call to the select routine on the selector,
+     * should at most last. If there are no evens at all, which is unlikely,
+     * then having no threshold would cause perpetual blocking.
+     */
+    private final static long SELECTOR_DELAY = 500;
+
+    /**
+     * Constructor
+     * @param b managing object for this client
      */
 
     Client(BitTorrentj b) {
 
         this.b = b;
         this.torrents = new HashMap<InfoHash, Torrent>();
-
+        this.commandQueue = new LinkedList<Command>();
     }
 
     /**
@@ -59,46 +73,58 @@ public class Client extends Thread {
     public void run() {
 
         // ALTER LATER TO SUPPORT INTERLEAVED BENINNING AND HALTING
+        // idea, put server management as one of the commands
         if(!startServer())
             return; // ?
 
-        // Event loop
+        // Main loop for processing new
+        // 1. connections and conducting handshakes
+        // 2. commands from client manager object b
         while(true) {
 
-            // Block until socket event is generated, or we are interreupted for some reason
+            // Get next channel event
+            int numberOfUpdatedKeys = 0;
+
             try {
-                selector.select();
-            } catch() {
+                numberOfUpdatedKeys = selector.select(SELECTOR_DELAY);
+            } catch(IOException e) {
 
             }
 
-            // Iterate keys
-            Iterator i = selector.selectedKeys().iterator();
+            // Process any potential channel events
+            if(numberOfUpdatedKeys > 0) {
 
-            while(i.hasNext()) {
+                // Iterate keys
+                Iterator i = selector.selectedKeys().iterator();
 
-                SelectionKey key = (SelectionKey) i.next();
+                while (i.hasNext()) {
 
-                // Remove from selected key set <-- ? why needed
-                i.remove();
+                    SelectionKey key = (SelectionKey) i.next();
 
-                // Ready to accept new connection
-                if (key.isAcceptable())
-                    accept();
+                    // Remove from selected key set,
+                    // otherwise it sticks around even after next select() call
+                    i.remove();
 
-                // Ready to be read
-                if (key.isReadable())
-                    read(key);
+                    // Ready to accept new connection
+                    if (key.isAcceptable())
+                        accept();
 
-                // Ready to be written to
-                if(key.isWritable())
-                    write(key);
+                    // Ready to be read
+                    if (key.isReadable())
+                        read(key);
+
+                    // Ready to be written to
+                    if (key.isWritable())
+                        write(key);
+                }
             }
 
-            // LOOK AT MESSAGE WHICH MAY HAVE ARRIVED FROM BITTORRENTJ
-            // concurrentlist.size() > 0 --> something to do
+            // Process at most one new command
+            processOneCommand();
 
         }
+
+        // Close server/selector?
     }
 
     /**
@@ -128,7 +154,7 @@ public class Client extends Thread {
             serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
         } catch (IOException e) {
-            b.addEvent(new StartServerErrorEvent(e, address)); // should we even have the address here?
+            sendEvent(new StartServerErrorEvent(e, address)); // should we even have the address here?
             return false;
         }
 
@@ -238,6 +264,37 @@ public class Client extends Thread {
     }
 
     /**
+     * Takes the latest command in the commandQueue and processes it
+     */
+    private void processOneCommand() {
+
+        // Get latest command
+        Command c;
+
+        synchronized (commandQueue) {
+
+            if(commandQueue.isEmpty())
+                return;
+            else
+                c = commandQueue.poll();
+        }
+
+        // Process
+        // <! -- magic happens here -- !>
+    }
+
+    /**
+     * Registers new command in queue, is called by client manager b
+     * @param c
+     */
+    public void registerCommand(Command c) {
+
+        synchronized (commandQueue) {
+            commandQueue.add(c);
+        }
+    }
+
+    /**
      * Count the total number of accepted connections
      * @return
      */
@@ -253,5 +310,13 @@ public class Client extends Thread {
         number += channelsBeforeHandshake.size();
 
         return number;
+    }
+
+    /**
+     *
+     * @param e
+     */
+    private void sendEvent(Event e) {
+        b.registerEvent(e);
     }
 }

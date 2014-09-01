@@ -1,6 +1,5 @@
 package org.bittorrentj;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 
 import org.bittorrentj.event.Event;
@@ -26,7 +25,7 @@ public class BitTorrentj {
     /**
      * Extension managers for BEP10 extensions
      */
-    ArrayList<Extension> extensions;
+    LinkedList<Extension> extensions;
 
     /**
      * How do we interpret this again??????
@@ -44,10 +43,7 @@ public class BitTorrentj {
      */
     private LinkedList<Event> eventQueue;
 
-    /**
-     * Queue com
-     */
-    private LinkedList<Command> commandQueue;
+
 
     /**
      * BitTorrentj constructor
@@ -57,7 +53,7 @@ public class BitTorrentj {
      * @param useDHT
      */
 
-    BitTorrentj(int port, int maxNumberOfConnections, ArrayList<Extension> extensions, boolean useDHT) {
+    BitTorrentj(int port, int maxNumberOfConnections, LinkedList<Extension> extensions, boolean useDHT) {
 
         this.port = port;
         this.maxNumberOfConnections = maxNumberOfConnections;
@@ -85,17 +81,17 @@ public class BitTorrentj {
     }
 
     public void addTorrent(String magnetLink) {
-
+        //client.registerCommand(new AddTorrentCommand())
     }
 
     public void addTorrent(Metainfo info) {
-
+        //client.registerCommand(new AddTorrentCommand())
     }
 
     /*
     some way of adding torrent which is partially downloaded, also support fast resume!!
     public void addTorrent(String directory) {
-
+        //client.registerCommand(new AddTorrentCommand())
     }
     */
 
@@ -115,7 +111,7 @@ public class BitTorrentj {
      * Is called by the client thread (ClientThread) for various reasons (see where for exhaustive list)
      * @param e event object
      */
-    void addEvent(Event e) {
+    void registerEvent(Event e) {
 
         synchronized (eventQueue) {
 

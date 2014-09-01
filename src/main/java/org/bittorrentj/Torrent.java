@@ -1,13 +1,24 @@
 package org.bittorrentj;
 
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import org.bittorrentj.Connection;
 
 /**
  * Created by bedeho on 30.08.2014.
  */
-public class Torrent {
+public class Torrent extends Thread {
+
+
+    /**
+     * Multiplexing selector for server
+     */
+    private Selector selector;
 
 
     /**
@@ -17,8 +28,91 @@ public class Torrent {
     private HashMap<String, Connection> channelsBeforeHandshake;
 
 
-    
+
     Torrent() {
+
+    }
+
+    run() {
+
+        // Event loop
+        while(true) {
+
+            // Block until socket event is generated, or we are interreupted for some reason
+            try {
+                selector.select();
+            } catch() {
+
+            }
+
+            // Iterate keys
+            Iterator i = selector.selectedKeys().iterator();
+
+            while(i.hasNext()) {
+
+                SelectionKey key = (SelectionKey) i.next();
+
+                // Remove from selected key set
+                i.remove();
+
+                // Ready to accept new connection
+                if (key.isAcceptable())
+                    accept();
+
+                // Ready to be read
+                if (key.isReadable())
+                    read(key);
+
+                // Ready to be written to
+                if(key.isWritable())
+                    write(key);
+            }
+
+            // LOOK AT MESSAGE WHICH MAY HAVE ARRIVED FROM BITTORRENTJ
+            // concurrentlist.size() > 0 --> something to do
+
+        }
+
+
+    }
+
+
+    /**
+     *
+     * @param key
+     */
+    private void read(SelectionKey key) {
+
+        // get the correct peer
+
+        // put data in input buffer
+
+        // call processing routine for peer
+
+        SocketChannel client = (SocketChannel) key.channel();
+
+        // Read byte coming from the client
+        int BUFFER_SIZE = 32;
+        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
+        try {
+            client.read(buffer);
+        }
+        catch (Exception e) {
+            // client is no longer active
+            e.printStackTrace();
+            continue;
+        }
+    }
+
+    /**
+     *
+     * @param key
+     */
+    private void write(SelectionKey key) {
+
+        // grab the output buffer of the relevant peer
+
+        // write it out
 
     }
 
