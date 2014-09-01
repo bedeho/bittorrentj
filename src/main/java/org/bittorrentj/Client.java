@@ -1,5 +1,6 @@
 package org.bittorrentj;
 
+import java.net.Socket;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -13,14 +14,27 @@ import java.io.IOException;
 import java.util.LinkedList;
 
 import org.bittorrentj.command.Command;
+import org.bittorrentj.event.Event;
 import org.bittorrentj.event.StartServerErrorEvent;
+import org.bittorrentj.event.ToManyConnectionsEvent;
+import org.bittorrentj.message.HandshakeMessage;
 
 public class Client extends Thread {
 
     /**
-     * Reference to main object
+     * Reference to client manager
      */
     private BitTorrentj b;
+
+    /**
+     * Raw byte form of handshake message sent by this client to all peers
+     */
+    private ByteBuffer rawHandshakeMessage;
+
+    /**
+     * Number of accepted connections which are in the process of conducting handshake
+     */
+    private int numberOfHandshakingConnections;
 
     /**
      * Collection of torrents presently being serviced
@@ -38,12 +52,6 @@ public class Client extends Thread {
     private Selector selector;
 
     /**
-     * Map of channels which have not completed handshake step.
-     * The key is InetSocketAddress.toString() which has format host:port.
-     */
-    private HashMap<String, SocketChannel> channelsBeforeHandshake;
-
-    /**
      * Queue of commands issued by managing object b
      */
     private LinkedList<Command> commandQueue;
@@ -56,6 +64,56 @@ public class Client extends Thread {
     private final static long SELECTOR_DELAY = 500;
 
     /**
+     * Stages during handshake from the perspective of the receiver of a connection
+     */
+    private enum Stage { START , READ_PSTRLEN
+
+
+        INFO_HASH_READ, HANDSHAKE_SENT};
+
+    /**
+     * Representation of full state of a connection during handshake stage
+     */
+    private class HandshakeReceiverState {
+
+        /**
+         * Stage representation
+         */
+        private Client.Stage s;
+
+        /**
+         * Buffer containing what has been read so far
+         */
+        private ByteBuffer b;
+        private final static int MAX_HANDSHAKE_MESSAGE_SIZE = 304; // 49 + len(pstr) <= 49 + 255 = 304
+
+        HandshakeReceiverState() {
+            this.s = Stage.START;
+            this.b = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
+        }
+
+        public Stage getS() {
+            return s;
+        }
+
+        public void setS(Stage s) {
+            this.s = s;
+        }
+
+        public ByteBuffer getB() {
+            return b;
+        }
+
+        /**
+         * How far we have read into handshake message
+         * @return position
+         */
+        public int readSoFar() {
+            return b.position();
+        }
+    }
+
+    /**
      * Constructor
      * @param b managing object for this client
      */
@@ -63,6 +121,13 @@ public class Client extends Thread {
     Client(BitTorrentj b) {
 
         this.b = b;
+        this.numberOfHandshakingConnections = 0;
+        /*
+                                    BEP 5 DHT
+                            BEP 6 Fast extension
+                            BEP 10
+         */
+        this.rawHandshakeMessage = new HandshakeMessage().toByteBuffer();
         this.torrents = new HashMap<InfoHash, Torrent>();
         this.commandQueue = new LinkedList<Command>();
     }
@@ -73,7 +138,8 @@ public class Client extends Thread {
     public void run() {
 
         // ALTER LATER TO SUPPORT INTERLEAVED BENINNING AND HALTING
-        // idea, put server management as one of the commands
+        // ***idea, put server management as one of the commands***
+        // Close server/selector as required by those commands
         if(!startServer())
             return; // ?
 
@@ -88,7 +154,7 @@ public class Client extends Thread {
             try {
                 numberOfUpdatedKeys = selector.select(SELECTOR_DELAY);
             } catch(IOException e) {
-
+                System.out.println("what can causes us to come here????"); // <= logg later in log4j
             }
 
             // Process any potential channel events
@@ -106,40 +172,41 @@ public class Client extends Thread {
                     i.remove();
 
                     // Ready to accept new connection
-                    if (key.isAcceptable())
-                        accept();
+                    if (key.isAcceptable()) {
+
+                        // Try to accept connection, and keep count if we succeed
+                        if(accept(key))
+                            numberOfHandshakingConnections++;
+                    }
 
                     // Ready to be read
-                    if (key.isReadable())
+                    if(key.isReadable())
                         read(key);
 
                     // Ready to be written to
-                    if (key.isWritable())
+                    if(key.isWritable())
                         write(key);
                 }
             }
 
             // Process at most one new command
             processOneCommand();
-
         }
-
-        // Close server/selector?
     }
 
     /**
-     *
+     * Starts server by creating the selector and binding to given port
      */
     private boolean startServer() {
 
         // Create server side address
         InetSocketAddress address = new InetSocketAddress("localhost", b.getPort());
 
-        // Create selector
-        selector = Selector.open();
-
         // Start server
         try {
+
+            // Create selector
+            selector = Selector.open();
 
             // Create server channel
             serverChannel = ServerSocketChannel.open();
@@ -162,26 +229,28 @@ public class Client extends Thread {
     }
 
     /**
-     *
+     * Routine for handling new connection on a channel
+     * @param key selection key with OP_ACCEPT set
      */
-    private void accept() {
+    private boolean accept(SelectionKey key) {
 
         // Check if we can accept one more connection
-        if(numberOfConnections() + 1 <= b.getMaxNumberOfConnections()) {
+        if(numberOfConnections() + 1 > b.getMaxNumberOfConnections()) {
 
-            // Create event??
-            b.addEvent(new ToManyConnectionsErrorEvent());
+            // Send notification
+            sendEvent(new ToManyConnectionsEvent());
 
-            // Continue processing next key
-            return;
+            // Signal that connection was not accepted
+            return false;
         }
 
         // Get socket channel
         SocketChannel client = serverChannel.accept();
 
         // Did we manage to actually accept connection? Why may this fail?
+        // if so, signal that connection was not accepted
         if(client == null)
-            return;
+            return false;
 
         // Set to non-blocking mode
         client.configureBlocking(false);
@@ -189,77 +258,77 @@ public class Client extends Thread {
         // recording to the selector (reading)
         client.register(selector, SelectionKey.OP_READ);
 
-        // Save channel
-        InetSocketAddress a;
+        // Attach state object with key
+        key.attach(new HandshakeReceiverState());
 
-        try {
-            a = client.getRemoteAddress();
-
-            channelsBeforeHandshake.put(a.toString(), client);
-        } catch (IOException e) {
-
-        }
-
-        // Continue processing next key
-
-                    /*
-                    wait for handshake message
-                    consume message up to and including info_hash
-                    do we serve info_hash it? if no: disconnect
-                    */
-
-                    /*
-
-
-                        true:
-                            then send our own handshake, set reserved bits to indicate we support
-                            BEP 5 DHT
-                            BEP 6 Fast extension
-                            BEP 10
-                            consume peer_id
-                            call upon torrents(info_hash).addPeer(socket, peer_id, reserved)
-                        false:
-                            disconnect
-                     */
-
+        // Signal that connection as accepted
+        return true;
     }
 
     /**
-     *
-     * @param key
+     * Routine for handling read opportunity on a channel
+     * @param key selection key with OP_READ set
      */
     private void read(SelectionKey key) {
 
-        // get the correct peer
+        // Recover channel state
+        HandshakeReceiverState state = (HandshakeReceiverState)key.attachment();
 
-        // put data in input buffer
+        // Recover channel
+        SocketChannel channel = (SocketChannel)key.channel();
 
-        // call processing routine for peer
+        // Handle based on stage of handshake
+        int readSoFar = state.readSoFar();
+        ByteBuffer b = state.getB();
 
-        SocketChannel client = (SocketChannel) key.channel();
+        switch(state.getS()) {
 
-        // Read byte coming from the client
-        int BUFFER_SIZE = 32;
-        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-        try {
-            client.read(buffer);
+            case START:
+
+                if(readSoFar == 0) {
+                    channel.read(b, )
+                } else {
+
+                    byte pstrlen = b.get();
+
+                }
+                // read as much as we can up to info_hash, then switch state
+
+                // do we serve info_hash it, if so // state.setS(Stage.INFO_HASH_READ);
+                // if not: disconnect
+
+                break;
+            case INFO_HASH_READ:
+
+                //consume peer_id, when done
+                //state.setS(Stage.HANDSHAKE_SENT);
+                break;
+            case HANDSHAKE_SENT:
+
+                   /*
+
+                        // begin creation of new peer, or even new TORRENT - depending on the situation
+                        // when the handshake content has been written and no io issue appeared
+                        // pass along the relevant handshake information also
+                        // upon torrents(info_hash).addPeer(socket, peer_id, reserved)
+                    */
+
+                break;
         }
-        catch (Exception e) {
-            // client is no longer active
-            e.printStackTrace();
-            continue;
-        }
+
     }
 
     /**
-     *
-     * @param key
+     * Routine for handling write opportunity on a channel
+     * @param key selection key with OP_WRITE set
      */
     private void write(SelectionKey key) {
 
         // grab the output buffer of the relevant peer
 
         // write it out
+
+
 
     }
 
@@ -285,7 +354,7 @@ public class Client extends Thread {
 
     /**
      * Registers new command in queue, is called by client manager b
-     * @param c
+     * @param c command to be registered
      */
     public void registerCommand(Command c) {
 
@@ -296,24 +365,24 @@ public class Client extends Thread {
 
     /**
      * Count the total number of accepted connections
-     * @return
+     * @return number of connections
      */
     private int numberOfConnections() {
 
         int number = 0;
 
         // Count the number of peers for each torrent
-        for(Torrent t: torrents)
+        for(Torrent t: torrents.values())
             number += t.getNumberOfPeers();
 
-        // Count the connections not yet having handshaked
-        number += channelsBeforeHandshake.size();
+        // Count the connections not yet having completed handshake
+        number += numberOfHandshakingConnections;
 
         return number;
     }
 
     /**
-     *
+     * Registers and event with the management object
      * @param e
      */
     private void sendEvent(Event e) {

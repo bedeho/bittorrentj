@@ -1,7 +1,7 @@
 package org.bittorrentj.event;
 
 import java.io.IOException;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
 /**
  * Created by bedeho on 30.08.2014.
@@ -16,9 +16,9 @@ public class StartServerErrorEvent implements Event {
     /**
      * Local address for server
      */
-    private InetAddress address;
+    private InetSocketAddress address;
 
-    public StartServerErrorEvent(IOException exception, InetAddress address) {
+    public StartServerErrorEvent(IOException exception, InetSocketAddress address) {
 
         this.exception = exception;
         this.address = address;

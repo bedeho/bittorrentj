@@ -5,7 +5,7 @@ import java.net.InetSocketAddress;
 /**
  * Created by bedeho on 31.08.2014.
  */
-public class ToManyConnectionsErrorEvent implements Event {
+public class ToManyConnectionsEvent implements Event {
 
     /**
      *
