@@ -1,6 +1,6 @@
 package org.bittorrentj.event;
 
-import org.bittorrentj.InfoHash;
+import org.bittorrentj.message.field.InfoHash;
 
 /**
  * Created by bedeho on 30.08.2014.

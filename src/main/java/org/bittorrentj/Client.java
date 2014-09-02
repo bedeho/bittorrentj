@@ -18,8 +18,9 @@ import org.bittorrentj.event.Event;
 import org.bittorrentj.event.StartServerErrorEvent;
 import org.bittorrentj.event.ToManyConnectionsEvent;
 import org.bittorrentj.message.HandshakeMessage;
-import org.bittorrentj.message.PeerId;
-import org.bittorrentj.message.Reserved;
+import org.bittorrentj.message.field.InfoHash;
+import org.bittorrentj.message.field.PeerId;
+import org.bittorrentj.message.field.Reserved;
 
 public class Client extends Thread {
 
@@ -87,41 +88,16 @@ public class Client extends Thread {
         public final static int MAX_HANDSHAKE_MESSAGE_SIZE = 304; // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
 
         /**
-         *
+         * Message received from peer, is filled continuously during handshake
          */
-        public int pstrlen;
+        public HandshakeMessage m;
 
-        /**
-         *
-         */
-        public String pstr;
-
-        /**
-         *
-         */
-        public Reserved reserved;
-
-        /**
-         *
-         */
-        public InfoHash info_hash;
-
-        /**
-         *
-         */
-        public PeerId peer_id;
-
-        HandshakeReceiverState() {
+        public HandshakeReceiverState() {
 
             this.s = Stage.START;
             this.b = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
             this.b.limit(1); // Initial read is of pstrlen field of one byte
-
-            this.pstrlen = 0;
-            this.pstr = null;
-            this.reserved = null;
-            this.info_hash = null;
-            this.peer_id = null;
+            this.m = new HandshakeMessage(0, "", null, null, null);
         }
     }
 
@@ -139,7 +115,7 @@ public class Client extends Thread {
                             BEP 6 Fast extension
                             BEP 10
          */
-        this.rawHandshakeMessage = new HandshakeMessage().toByteBuffer();
+        this.rawHandshakeMessage = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(), ,).toByteBuffer();
         this.torrents = new HashMap<InfoHash, Torrent>();
 
     }

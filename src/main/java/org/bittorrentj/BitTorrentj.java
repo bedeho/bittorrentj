@@ -3,7 +3,7 @@ package org.bittorrentj;
 import java.util.LinkedList;
 
 import org.bittorrentj.event.Event;
-import org.bittorrentj.command.Command;
+import org.bittorrentj.message.field.InfoHash;
 import org.bittorrentj.torrent.Metainfo;
 import org.bittorrentj.torrent.TorrentInterface;
 

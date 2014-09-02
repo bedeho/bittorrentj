@@ -1,4 +1,4 @@
-package org.bittorrentj;
+package org.bittorrentj.message.field;
 
 import java.util.Arrays;
 

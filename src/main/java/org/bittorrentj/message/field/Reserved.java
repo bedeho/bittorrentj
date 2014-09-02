@@ -1,4 +1,4 @@
-package org.bittorrentj.message;
+package org.bittorrentj.message.field;
 
 /**
  * Created by bedeho on 02.09.2014.
