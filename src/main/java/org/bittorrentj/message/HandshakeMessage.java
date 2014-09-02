@@ -1,5 +1,7 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.InfoHash;
+
 /**
  * Created by bedeho on 01.09.2014.
  */
@@ -8,12 +10,26 @@ public class HandshakeMessage {
     /**
      * Length of pstr field
      */
-    private int pstrlen;
+    public int pstrlen;
 
     /**
      * Protocol identifier, BitTorrent 1.0 uses "BitTorrent protocol", hence pstrlen=19
      */
-    private String pstr;
+    public String pstr;
 
-    private
+    /**
+     *
+     */
+    public Reserved reserved;
+
+    /**
+     *
+     */
+    public InfoHash info_hash;
+
+    /**
+     *
+     */
+    public PeerId peer_id;
+
 }

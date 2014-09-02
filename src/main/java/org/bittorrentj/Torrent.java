@@ -14,7 +14,6 @@ import org.bittorrentj.Connection;
  */
 public class Torrent extends Thread {
 
-
     /**
      * Multiplexing selector for server
      */
@@ -28,6 +27,24 @@ public class Torrent extends Thread {
     private HashMap<String, Connection> channelsBeforeHandshake;
 
 
+    /*
+    fields
+        ArrayList<Peer> peers
+        metainfo, when it becomes available…
+        CallBackHandler
+        info/resources for file
+        piece information, what different peers are doing?
+        per peer statistics?
+        settings?
+        IPban list ←-
+        Thread networkWorker, diskWorker
+        constructor(int maxNumberOfConnections, int minimumNumberOfConnections, int maxNumberOfUploads, int max, ArrayList<Extension>,CallBackHandler, [magnet link or Metainfo]): typically called by BitTorrentj addTorrent()
+
+        register torrent with extensions, for all i=1:Extension.length
+        Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
+        confirms magnet link validity if present
+        Create worker threads, but dont start
+     */
 
     Torrent() {
 
@@ -123,24 +140,39 @@ public class Torrent extends Thread {
     int getNumberOfPeers() {
 
     }
+
+    /**
+     *
+     */
+    public addConnection(channel, state.pstr, state.reserved, state,info_hash, state.peer_id) {
+
+    }
+
+    /**
+     *
+     * @return
+     */
+    public list getConnections() {
+
+    }
+
+    /**
+     *
+     * @return
+     */
+    public Connection getConnection() {
+
+    }
+
+    /**
+     *
+     */
+    public void removeConnection() {
+
+    }
 }
 /*
-fields
-        ArrayList<Peer> peers
-        metainfo, when it becomes available…
-        CallBackHandler
-        info/resources for file
-        piece information, what different peers are doing?
-        per peer statistics?
-        settings?
-        IPban list ←-
-        Thread networkWorker, diskWorker
-        constructor(int maxNumberOfConnections, int minimumNumberOfConnections, int maxNumberOfUploads, int max, ArrayList<Extension>,CallBackHandler, [magnet link or Metainfo]): typically called by BitTorrentj addTorrent()
 
-        register torrent with extensions, for all i=1:Extension.length
-        Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
-        confirms magnet link validity if present
-        Create worker threads, but dont start
 synchronized begin() : called from BitTorrentj addTorrent in fresh thread, or begin() from BitTorrentj
         Check that we arent already running??
 

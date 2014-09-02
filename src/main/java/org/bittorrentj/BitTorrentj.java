@@ -88,13 +88,6 @@ public class BitTorrentj {
         //client.registerCommand(new AddTorrentCommand())
     }
 
-    /*
-    some way of adding torrent which is partially downloaded, also support fast resume!!
-    public void addTorrent(String directory) {
-        //client.registerCommand(new AddTorrentCommand())
-    }
-    */
-
     public TorrentInterface getTorrent(InfoHash h) {
 
         // get session stats:  TorrentStatistics
@@ -162,7 +155,7 @@ public class BitTorrentj {
         return maxNumberOfConnections;
     }
 
-    ArrayList<Extension> getExtensions() {
+    LinkedList<Extension> getExtensions() {
         return extensions;
     }
 
