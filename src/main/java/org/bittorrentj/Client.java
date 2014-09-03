@@ -35,9 +35,9 @@ public class Client extends Thread {
     private int numberOfHandshakingConnections;
 
     /**
-     * Collection of torrents presently being serviced
+     * Collection of torrentSwarms presently being serviced
      */
-    private HashMap<InfoHash, Torrent> torrents;
+    private HashMap<InfoHash, TorrentSwarm> torrentSwarms;
 
     /**
      * Socket channel used for server
@@ -105,7 +105,7 @@ public class Client extends Thread {
 
         this.b = b;
         this.numberOfHandshakingConnections = 0;
-        this.torrents = new HashMap<InfoHash, Torrent>();
+        this.torrentSwarms = new HashMap<InfoHash, TorrentSwarm>();
 
     }
 
@@ -306,7 +306,7 @@ public class Client extends Thread {
                         state.m.setInfo_hash(new InfoHash(info_hash));
 
                         // Do we serve this torrent?
-                        if(torrents.containsKey(state.m.getInfo_hash())) {
+                        if(torrentSwarms.containsKey(state.m.getInfo_hash())) {
 
                             // Alter stage
                             state.s = Stage.INFO_HASH_READ;
@@ -347,7 +347,7 @@ public class Client extends Thread {
                     state.m.setPeer_id();
 
                     // Add peer to given torrent
-                    torrents.get(state.m.getInfo_hash()).addPeer(channel, state.m);
+                    torrentSwarms.get(state.m.getInfo_hash()).addPeer(channel, state.m);
                 }
 
                 break;
@@ -421,7 +421,7 @@ public class Client extends Thread {
         int number = 0;
 
         // Count the number of peers for each torrent.
-        for(Torrent t: torrents.values())
+        for(TorrentSwarm t: torrentSwarms.values())
             number += t.getNumberOfPeers();
 
         // Count the connections not yet having completed handshake

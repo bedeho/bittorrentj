@@ -15,12 +15,12 @@ static HashMap<String, Bencoded>: fields added flat into the BEP10 handshake
 
         getExtentionName()
         returns name of this extension
-        getFlatKeys(Torrent)
+        getFlatKeys(TorrentSwarm)
         returns flat keys for this torrent
-        addTorrent(Torrent)
+        addTorrent(TorrentSwarm)
         begin()
         halt()
-        processMessage(peer, ByteBuffer) : does this need peer, or really just socket and Torrent: perhaps it needs to know what it is selling or buying from individual peers? would be important/cool to know
+        processMessage(peer, ByteBuffer) : does this need peer, or really just socket and TorrentSwarm: perhaps it needs to know what it is selling or buying from individual peers? would be important/cool to know
         Note!!!:
         for an extension to actually modify its peer/torrent, it must wait for lock on it!!!
 */

@@ -76,7 +76,7 @@ fields
         constructor(socket, peer_id, reserved, torrent)
         save fields
         isConnected = true
-        run()
+        TorrentSwarm()
         if peer supports BEP10, send handshake with torrent.createExtensionHandshakeDictionary()
         while(1) :
         classic message
@@ -94,7 +94,7 @@ fields
         WHAT DOES THREAD DO, SLEEP ?
 private methods for extensions to call
 private sendExtendedMessage(ByteBuffer/ExtendedMessage) : allows extensions to send messages to peer
-        socket.send(buffer): on disconnect do as in run() and return false to Extension!! (extension can use to put peer in ban list or something)
+        socket.send(buffer): on disconnect do as in TorrentSwarm() and return false to Extension!! (extension can use to put peer in ban list or something)
 private closeConnection()
         something?
 private disableExtension() : called to disable itself, perhaps if it is not longer needed

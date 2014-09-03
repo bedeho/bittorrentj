@@ -52,15 +52,15 @@ public class HandshakeMessage {
         this.info_hash = info_hash;
         this.peer_id = peer_id;
 
-        // Make sure pstr and pstrelen agree
+        // Make sure pstr and pstrlen agree
         if(this.pstr != null && (this.pstr.length() != this.pstrlen))
             throw new IllegalArgumentException("pstrlen and pstr are not compatible");
     }
 
     /**
-     *
-     * @return
-     * @throws IllegalStateException when all fields are not set
+     * Gives the raw byte array form of the message
+     * @return byte array of message
+     * @throws IllegalStateException when all fields are not set, or pstrlen and pstr are not compatible
      */
     private byte [] toRaw() throws IllegalStateException {
 
@@ -68,6 +68,8 @@ public class HandshakeMessage {
         // then buffer form is not available
         if(pstrlen == 0 || pstr == null || reserved == null || info_hash == null || peer_id == null)
             throw new IllegalStateException("All fields are not set");
+        else if(this.pstr.length() != this.pstrlen)
+            throw new IllegalStateException("pstrlen and pstr are not compatible");
 
         // Size of new package
         int total_size = 1 + pstrlen + Reserved.getLength() + InfoHash.getLength() + PeerId.getLength();
@@ -76,11 +78,23 @@ public class HandshakeMessage {
         byte [] raw = new byte[total_size];
 
         // Fill
-        int to = 0;
+        raw[0] = (byte)pstrlen;
 
+        // pstrlen
+        int to = 1;
+        System.arraycopy(pstr.getBytes(), 0, raw, to, pstr.length());
 
+        // reserved
+        to += pstr.length();
+        System.arraycopy(reserved.getRaw(), 0, raw, to, Reserved.getLength());
 
+        // info_hash
+        to += Reserved.getLength();
+        System.arraycopy(info_hash.getRaw(), 0, raw, to, InfoHash.getLength());
 
+        // peer_id
+        to += InfoHash.getLength();
+        System.arraycopy(peer_id.getRaw(), 0, raw, to, PeerId.getLength());
 
         // Return
         return raw;
