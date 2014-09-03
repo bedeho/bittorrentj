@@ -10,14 +10,10 @@ public class PeerId {
      * https://wiki.theory.org/BitTorrentSpecification#Reserved_Bytes
      **/
 
-    public enum id {
-
+    public enum PeerType {
+        BitSwapr()
+        Uknown()
     }
-
-    /**
-     * Byte length of an info hash
-     */
-    private final int LENGTH = 20;
 
     /**
      *
@@ -26,11 +22,42 @@ public class PeerId {
 
     /**
      *
+     */
+    private PeerType peer;
+
+    /**
+     *
      * @param peer_id
      */
-    PeerId(byte[] peer_id) {
+    public PeerId(byte[] peer_id) {
 
     }
 
+    /**
+     *
+     * @param peer
+     */
+    public PeerId(PeerType peer) {
+        this.peer = peer;
+
+
+
+    }
+
+    /**
+     * Get byte array for peer_id field. Altering array changes
+     * @return
+     */
+    public byte[] getRaw() {
+        return peer_id;
+    }
+
+    /**
+     * Byte length of a peer_id field
+     * @return
+     */
+    public static int getLength() {
+        return 20;
+    }
 
 }

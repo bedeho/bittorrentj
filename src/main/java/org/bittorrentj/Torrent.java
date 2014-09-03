@@ -139,6 +139,8 @@ public class Torrent extends Thread {
      */
     int getNumberOfPeers() {
 
+        // needs to be synched?
+
     }
 
     /**
@@ -146,6 +148,7 @@ public class Torrent extends Thread {
      */
     public addConnection(channel, state.pstr, state.reserved, state,info_hash, state.peer_id) {
 
+        register channel with selector
     }
 
     /**

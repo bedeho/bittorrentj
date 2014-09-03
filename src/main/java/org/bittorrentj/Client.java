@@ -30,11 +30,6 @@ public class Client extends Thread {
     private BitTorrentj b;
 
     /**
-     * Raw byte form of handshake message sent by this client to all peers
-     */
-    private ByteBuffer rawHandshakeMessage;
-
-    /**
      * Number of accepted connections which are in the process of conducting handshake
      */
     private int numberOfHandshakingConnections;
@@ -64,7 +59,7 @@ public class Client extends Thread {
      * should at most last. If there are no evens at all, which is unlikely,
      * then having no threshold would cause perpetual blocking.
      */
-    private final static long SELECTOR_DELAY = 500;
+    private final static long SELECTOR_DELAY = 100;
 
     /**
      * Stages during handshake from the perspective of the receiver of a connection
@@ -74,7 +69,7 @@ public class Client extends Thread {
     /**
      * Representation of full state of a connection during handshake stage
      */
-    private class HandshakeReceiverState {
+    class HandshakeReceiverState {
 
         /**
          * Stage representation
@@ -106,16 +101,10 @@ public class Client extends Thread {
      * @param b managing object for this client
      */
 
-    Client(BitTorrentj b) {
+    public Client(BitTorrentj b) {
 
         this.b = b;
         this.numberOfHandshakingConnections = 0;
-        /*
-                                    BEP 5 DHT
-                            BEP 6 Fast extension
-                            BEP 10
-         */
-        this.rawHandshakeMessage = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(), ,).toByteBuffer();
         this.torrents = new HashMap<InfoHash, Torrent>();
 
     }
@@ -168,8 +157,17 @@ public class Client extends Thread {
                     }
 
                     // Ready to be read
-                    if(key.isReadable())
-                        read(key);
+                    if(key.isReadable()) {
+                        try {
+                            read(key);
+                        } catch (IOException e) {
+                            //
+                            //
+                            //
+                            //
+                        }
+                    }
+
 
                     // Ready to be written to
                     if(key.isWritable())
@@ -282,10 +280,10 @@ public class Client extends Thread {
                     if(b.remaining() == 0) {
 
                         // Save pstrlen in state
-                        state.pstrlen = (int) b.get(0);
+                        state.m.setPstrlen((int)b.get(0));
 
                         // Set new limit to read up to and including info_hash field
-                        b.limit(1 + state.pstrlen + 8 + 20);
+                        b.limit(1 + state.m.getPstrlen() + Reserved.getLength() + PeerId.getLength());
                     }
 
                 } else { // Yes
@@ -296,29 +294,39 @@ public class Client extends Thread {
                     // Did we read it all?
                     if(b.remaining() == 0) {
 
-                        // Save variables in state
-                        byte[] raw = b.array();
+                        // Extract fields from buffer
+                        byte[] full = b.array();
+                        byte[] pstr = Arrays.copyOfRange(full, 1, 1 + state.m.getPstrlen());
+                        byte[] reserved = Arrays.copyOfRange(full, 1 + state.m.getPstrlen(), 1 + state.m.getPstrlen() + Reserved.getLength());
+                        byte[] info_hash = Arrays.copyOfRange(full, 1 + state.m.getPstrlen() + Reserved.getLength(), 1 + state.m.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
 
-                        state.pstr = Arrays.copyOf(raw, 1, 1 + state.pstrlen).toString();
-                        state.reserved = new Reserved(Arrays.copyOf(raw, 1 + state.pstrlen + 1, 1 + state.pstrlen + 1 + 8));
-                        state.info_hash = new InfoHash(Arrays.copyOf(raw, 1 + state.pstrlen + 1, 1 + state.pstrlen + 1 + 8));
+                        // Save variables in state
+                        state.m.setPstr(pstr.toString());
+                        state.m.setReserved(new Reserved(reserved));
+                        state.m.setInfo_hash(new InfoHash(info_hash));
 
                         // Do we serve this torrent?
-                        if(torrents.containsKey(state.info_hash)) {
+                        if(torrents.containsKey(state.m.getInfo_hash())) {
 
                             // Alter stage
                             state.s = Stage.INFO_HASH_READ;
 
                             // Set new buffer limit to read peer_id
-                            b.limit(b.limit() + 20);
+                            b.limit(b.limit() + PeerId.getLength());
+
+                            // Alter interest set so that we can ONLY read
+                            key.interestOps(xxx)
 
                         } else {
 
                             // Send event
-                            sendEvent(new UnrecognizedInfoHashEvent(channel.socket().getInetAddress(), state.info_hash));
+                            sendEvent(new UnrecognizedInfoHashEvent(channel.socket().getInetAddress(), state.m.getInfo_hash()));
 
                             // Disconnect
                             channel.close();
+
+                            // Deregister channel
+                            selector.re
                         }
                     }
                 }
@@ -336,10 +344,10 @@ public class Client extends Thread {
                 if(b.remaining() == 0) {
 
                     // Save peer_id
-                    state.peer_id = ;
+                    state.m.setPeer_id();
 
                     // Add peer to given torrent
-                    torrents.get(state.info_hash).addPeer(channel, state.pstr, state.reserved, state, state.info_hash, state.peer_id);
+                    torrents.get(state.m.getInfo_hash()).addPeer(channel, state.m);
                 }
 
                 break;
@@ -353,7 +361,16 @@ public class Client extends Thread {
      */
     private void write(SelectionKey key) {
 
+        // Recover channel state
+        HandshakeReceiverState state = (HandshakeReceiverState)key.attachment();
+
+        // Recover channel
+        SocketChannel channel = (SocketChannel)key.channel();
+
         // grab the output buffer of the relevant peer
+
+        //HandshakeMessage m = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(true, true), state.m.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
+        //send m.toByteBuffer()
 
         // write it out
 
@@ -394,14 +411,16 @@ public class Client extends Thread {
     }
 
     /**
-     * Count the total number of accepted connections
+     * Count the total number of accepted connections. Keep in mind that channels
+     * may be closed by peers during counting,
+     * hence this routines gives an upper bound, which is fine.
      * @return number of connections
      */
     private int numberOfConnections() {
 
         int number = 0;
 
-        // Count the number of peers for each torrent
+        // Count the number of peers for each torrent.
         for(Torrent t: torrents.values())
             number += t.getNumberOfPeers();
 
