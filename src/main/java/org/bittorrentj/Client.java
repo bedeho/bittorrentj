@@ -106,7 +106,6 @@ public class Client extends Thread {
         this.b = b;
         this.numberOfHandshakingConnections = 0;
         this.torrentSwarms = new HashMap<InfoHash, TorrentSwarm>();
-
     }
 
     /**

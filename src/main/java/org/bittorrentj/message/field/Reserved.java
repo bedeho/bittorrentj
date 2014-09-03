@@ -30,12 +30,15 @@ public class Reserved {
     public Reserved(boolean dhtIsUsed, boolean extensionProtocolIsUsed){
 
         // Allocate space for field
-        this.reserved = new byte[getLength()];
+        reserved = new byte[getLength()];
 
-        // Set positions
+        // DHT uses very last bit, set it if needed
+        if(dhtIsUsed)
+            reserved[8] |= (byte)0x80;
 
-        dhtIsUsed
-                extensionProtocolIsUsed
+        // Extension protocol uses bit 20 from the right, set it if needed
+        if(extensionProtocolIsUsed)
+            reserved[5] |= (byte)0x10;
     }
 
 
@@ -44,7 +47,7 @@ public class Reserved {
      * @return true iff DHT flag is set
      */
     public boolean getDhtIsUsed() {
-        return reserved[] & ;
+        return (reserved[8] & (byte)0x80) == 1;
     }
 
     /**
@@ -52,7 +55,7 @@ public class Reserved {
      * @return true iff Extension protocol flag is set
      */
     public boolean getExtensionProtocolIsUsed() {
-        return reserved[] & ;
+        return (reserved[5] & (byte)0x10) == 1;
     }
 
     /**
