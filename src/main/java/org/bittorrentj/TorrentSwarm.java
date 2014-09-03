@@ -10,6 +10,8 @@ import java.util.Iterator;
 
 import org.bittorrentj.Connection;
 import org.bittorrentj.message.HandshakeMessage;
+import org.bittorrentj.message.field.InfoHash;
+import org.bittorrentj.torrent.Metainfo;
 
 /**
  * Created by bedeho on 30.08.2014.
@@ -17,39 +19,54 @@ import org.bittorrentj.message.HandshakeMessage;
 public class TorrentSwarm extends Thread {
 
     /**
+     * Info_hash for this torrent swarm
+     */
+    private InfoHash info_hash;
+
+    /**
+     * Torrent file metainfo
+     */
+    private Metainfo metainfo;
+
+    /**
      * Multiplexing selector for server
      */
     private Selector selector;
 
+    /**
+     * Client object this swarm belongs to
+     */
+    private Client client;
 
     /**
-     * Map of channels which have not completed handshake step.
-     * The key is InetSocketAddress.toString() which has format host:port.
+     * Maps IP:Port to corresponding connection object
      */
-    private HashMap<String, Connection> channelsBeforeHandshake;
+    private HashMap<String, Connection> connections;
 
-
+    // diskworker?
     /*
     fields
-        ArrayList<Peer> peers
-        metainfo, when it becomes available…
-        CallBackHandler
-        info/resources for file
-        piece information, what different peers are doing?
-        per peer statistics?
+
+
+
+
+
         settings?
-        IPban list ←-
-        Thread networkWorker, diskWorker
+
+
         constructor(int maxNumberOfConnections, int minimumNumberOfConnections, int maxNumberOfUploads, int max, ArrayList<Extension>,CallBackHandler, [magnet link or Metainfo]): typically called by BitTorrentj addTorrent()
 
         register torrent with extensions, for all i=1:Extension.length
-        Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
+
         confirms magnet link validity if present
-        Create worker threads, but dont start
+
      */
 
-    TorrentSwarm() {
+    public TorrentSwarm(InfoHash info_hash) {
 
+        this.info_hash = info_hash
+
+                //Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
     }
 
     TorrentSwarm() {

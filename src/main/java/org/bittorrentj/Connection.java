@@ -57,6 +57,8 @@ public class Connection {
         }
     }
 
+    private ConnectionStatistics statistics;
+
     /*
     public enum State {
         BEFORE_HANDSHAKE(1),
