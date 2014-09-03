@@ -5,12 +5,18 @@ import java.util.LinkedList;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.message.field.InfoHash;
 import org.bittorrentj.torrent.Metainfo;
-import org.bittorrentj.torrent.TorrentInterface;
 
 /**
  * Created by bedeho on 30.08.2014.
  */
 public class BitTorrentj {
+
+    /**
+     * Version information for this edition of BitTorrentj
+     */
+    public final static int majorVersion = 0;
+    public final static int minorVersion = 0;
+    public final static int tinyVersion = 0;
 
     /**
      * Port that will be used to listen for incoming connections
@@ -43,8 +49,6 @@ public class BitTorrentj {
      */
     private LinkedList<Event> eventQueue;
 
-
-
     /**
      * BitTorrentj constructor
      * @param port
@@ -71,13 +75,12 @@ public class BitTorrentj {
     /**
      * Starts the server listening on the given port
      */
-    public void begin() {
-        // send a message for the thread to start again?
+    public void beginClient() {
+        //client.registerCommand(new BeginCommand())
     }
 
-    public void halt() {
-        // send a message for the thread to stop
-        // clear event queue?
+    public void haltClient() {
+        //client.registerCommand(new HaltCommand())
     }
 
     public void addTorrent(String magnetLink) {
@@ -88,15 +91,23 @@ public class BitTorrentj {
         //client.registerCommand(new AddTorrentCommand())
     }
 
-    public TorrentInterface getTorrent(InfoHash h) {
+    public void removeTorrent(InfoHash h) {
+        //client.registerCommand(new RemoveTorrentCommand())
+    }
+
+    public void getTorrentState(InfoHash h) {
+        //client.registerCommand(new GetTorrentSwarmStateCommand())
+
 
         // get session stats:  TorrentStatistics
         // change/view settings
         // pause, stop start
         // list,add,remove peers
         // etc
+    }
 
-        return null;
+    public void alterTorrentSettings(InfoHash h) {
+
     }
 
     /**
@@ -143,10 +154,6 @@ public class BitTorrentj {
         }
     }
 
-    public void removeTorrent(InfoHash h) {
-
-    }
-
     int getPort() {
         return port;
     }
@@ -155,9 +162,12 @@ public class BitTorrentj {
         return maxNumberOfConnections;
     }
 
+    // what if this list is messed with??
+    /*
     LinkedList<Extension> getExtensions() {
         return extensions;
     }
+    */
 
     boolean isUseDHT() {
         return useDHT;

@@ -1,6 +1,11 @@
 package org.bittorrentj.message.field;
 
 /**
+ * Table of known uses for reserved bits
+ * https://wiki.theory.org/BitTorrentSpecification#Reserved_Bytes
+ **/
+
+/**
  * Created by bedeho on 02.09.2014.
  */
 public class Reserved {
@@ -40,7 +45,6 @@ public class Reserved {
         if(extensionProtocolIsUsed)
             reserved[5] |= (byte)0x10;
     }
-
 
     /**
      * Recovers DHT flag from reserved field

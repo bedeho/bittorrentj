@@ -100,7 +100,6 @@ public class Client extends Thread {
      * Constructor
      * @param b managing object for this client
      */
-
     public Client(BitTorrentj b) {
 
         this.b = b;
@@ -113,7 +112,7 @@ public class Client extends Thread {
      */
     public void run() {
 
-        // ALTER LATER TO SUPPORT INTERLEAVED BENINNING AND HALTING
+        // ALTER LATER TO SUPPORT INTERLEAVED BEGINNING AND HALTING
         // ***idea, put server management as one of the commands***
         // Close server/selector as required by those commands
         if(!startServer())
@@ -174,7 +173,7 @@ public class Client extends Thread {
                 }
             }
 
-            // Process at most one new command
+            // Process at most one new command, if available
             processOneCommand();
         }
     }
@@ -240,7 +239,7 @@ public class Client extends Thread {
         // Set to non-blocking mode
         client.configureBlocking(false);
 
-        // recording to the selector (reading)
+        // Register with with selector ONLY for reading
         client.register(selector, SelectionKey.OP_READ);
 
         // Attach state object with key
@@ -282,7 +281,7 @@ public class Client extends Thread {
                         state.m.setPstrlen((int)b.get(0));
 
                         // Set new limit to read up to and including info_hash field
-                        b.limit(1 + state.m.getPstrlen() + Reserved.getLength() + PeerId.getLength());
+                        b.limit(1 + state.m.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
                     }
 
                 } else { // Yes
@@ -293,46 +292,63 @@ public class Client extends Thread {
                     // Did we read it all?
                     if(b.remaining() == 0) {
 
-                        // Extract fields from buffer
+                        // Extract fields from buffer and save in state
                         byte[] full = b.array();
-                        byte[] pstr = Arrays.copyOfRange(full, 1, 1 + state.m.getPstrlen());
-                        byte[] reserved = Arrays.copyOfRange(full, 1 + state.m.getPstrlen(), 1 + state.m.getPstrlen() + Reserved.getLength());
-                        byte[] info_hash = Arrays.copyOfRange(full, 1 + state.m.getPstrlen() + Reserved.getLength(), 1 + state.m.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
 
-                        // Save variables in state
+                        // pstr
+                        int from = 1;
+                        int to = from + state.m.getPstrlen();
+                        byte[] pstr = Arrays.copyOfRange(full, from, to);
                         state.m.setPstr(pstr.toString());
+
+                        // reserved
+                        from = to;
+                        to += Reserved.getLength();
+                        byte[] reserved = Arrays.copyOfRange(full, from, to);
                         state.m.setReserved(new Reserved(reserved));
+
+                        //  info_hash
+                        from = to;
+                        to += InfoHash.getLength();
+                        byte[] info_hash = Arrays.copyOfRange(full, from, to);
                         state.m.setInfo_hash(new InfoHash(info_hash));
 
                         // Do we serve this torrent?
-                        if(torrentSwarms.containsKey(state.m.getInfo_hash())) {
+                        TorrentSwarm t = torrentSwarms.get(state.m.getInfo_hash());
+                        if(t != null) {
 
-                            // Alter stage
-                            state.s = Stage.INFO_HASH_READ;
+                            // Can this swarm handle one more client
+                            if(t.acceptsMoreConnections()) {
 
-                            // Set new buffer limit to read peer_id
-                            b.limit(b.limit() + PeerId.getLength());
+                                // Alter stage
+                                state.s = Stage.INFO_HASH_READ;
 
-                            // Alter interest set so that we can ONLY read
-                            key.interestOps(xxx)
+                                // Alter interest set so that we can ONLY write our handshake
+                                key.interestOps(SelectionKey.OP_WRITE);
+                            } else {
 
+                                // Send event
+                                sendEvent(new TorrentSwarmFullEvent(channel.socket().getInetAddress(), state.m.getInfo_hash()));
+
+                                // Disconnect, and therefor also automatically unregister with selector
+                                channel.close();
+                            }
                         } else {
 
                             // Send event
                             sendEvent(new UnrecognizedInfoHashEvent(channel.socket().getInetAddress(), state.m.getInfo_hash()));
 
-                            // Disconnect
+                            // Disconnect, and therefor also automatically unregister with selector
                             channel.close();
-
-                            // Deregister channel
-                            selector.re
                         }
                     }
                 }
 
                 break;
             case INFO_HASH_READ:
-                // do nothing, its time to write our handshake in write() routine, it will set HANDSHAKE_SENT
+                // We should not end up here, given that we set OP_WRITE as only channel event we care about
+                // because it is time to write our handshake in write() routine, it will set HANDSHAKE_SENT
+                // when done
                 break;
             case HANDSHAKE_SENT:
 
@@ -343,10 +359,18 @@ public class Client extends Thread {
                 if(b.remaining() == 0) {
 
                     // Save peer_id
-                    state.m.setPeer_id();
+                    int from = 1 + state.m.getPstrlen() + Reserved.getLength() + InfoHash.getLength();
+                    int to = from + PeerId.getLength();
+                    byte[] peer_id = Arrays.copyOfRange(b.array(), from, to);
+
+                    // Save peer_id in state
+                    state.m.setPeer_id(new PeerId(peer_id));
+
+                    // Unregister channel with this selector, will be registered in TorrentSwarm object
+                    key.cancel();
 
                     // Add peer to given torrent
-                    torrentSwarms.get(state.m.getInfo_hash()).addPeer(channel, state.m);
+                    torrentSwarms.get(state.m.getInfo_hash()).addConnection(channel, state.m);
                 }
 
                 break;
@@ -375,7 +399,11 @@ public class Client extends Thread {
 
         // on info hash read_, send handshake, when done set //state.setS(Stage.HANDSHAKE_SENT);
 
+        // Alter state so that we can only read, in order to get peer_id
+        key.interestOps(SelectionKey.OP_READ);
 
+        // Set new buffer limit to read peer_id
+        state.b.limit(state.b.limit() + PeerId.getLength());
     }
 
     /**

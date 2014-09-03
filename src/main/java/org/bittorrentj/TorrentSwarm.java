@@ -1,5 +1,6 @@
 package org.bittorrentj;
 
+import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -8,6 +9,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 import org.bittorrentj.Connection;
+import org.bittorrentj.message.HandshakeMessage;
 
 /**
  * Created by bedeho on 30.08.2014.
@@ -134,7 +136,7 @@ public class TorrentSwarm extends Thread {
     }
 
     /**
-     *
+     * Number of connections in swarm at present
      * @return
      */
     int getNumberOfPeers() {
@@ -144,11 +146,19 @@ public class TorrentSwarm extends Thread {
     }
 
     /**
+     * Indicates whether this swarm accepts more connections
+     * @return
+     */
+    boolean acceptsMoreConnections() {
+
+    }
+
+    /**
      *
      */
-    public TorrentSwarm(channel, state.pstr, state.reserved, state, info_hash, state.peer_id) {
+    public void addConnection(SocketChannel channel, HandshakeMessage m) {
 
-        register channel with selector
+        //register channel with selector with both opread and opwrite
     }
 
     /**
