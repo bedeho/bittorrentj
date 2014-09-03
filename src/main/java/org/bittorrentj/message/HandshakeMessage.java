@@ -62,7 +62,7 @@ public class HandshakeMessage {
      * @return byte array of message
      * @throws IllegalStateException when all fields are not set, or pstrlen and pstr are not compatible
      */
-    private byte [] toRaw() throws IllegalStateException {
+    public byte [] toRaw() throws IllegalStateException {
 
         // If all fields are not set, which can be the case due to how handshake has a pause step,
         // then buffer form is not available

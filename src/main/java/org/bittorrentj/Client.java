@@ -1,14 +1,11 @@
 package org.bittorrentj;
 
+import java.nio.channels.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
 import java.nio.ByteBuffer;
 import java.net.InetSocketAddress;
 import java.io.IOException;
@@ -50,7 +47,7 @@ public class Client extends Thread {
     private Selector selector;
 
     /**
-     * Queue of commands issued by managing object b
+     * Queue of commands issued by managing object inputBuffer
      */
     private LinkedList<Command> commandQueue;
 
@@ -79,20 +76,31 @@ public class Client extends Thread {
         /**
          * Buffer containing what has been read so far
          */
-        public ByteBuffer b;
+        public ByteBuffer inputBuffer;
         public final static int MAX_HANDSHAKE_MESSAGE_SIZE = 304; // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
 
         /**
          * Message received from peer, is filled continuously during handshake
          */
-        public HandshakeMessage m;
+        public HandshakeMessage messageReceived;
 
+        /**
+         * Contains message sent from from client to peer, is built just after reading info_hash.
+         * There is no need to keep the HandshakeMessage object around itself, since the
+         * raw form is put into this buffer right away.
+         */
+        public ByteBuffer outputBuffer;
+
+        /**
+         * Constructor
+         */
         public HandshakeReceiverState() {
 
             this.s = Stage.START;
-            this.b = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
-            this.b.limit(1); // Initial read is of pstrlen field of one byte
-            this.m = new HandshakeMessage(0, "", null, null, null);
+            this.inputBuffer = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
+            this.inputBuffer.limit(1); // Initial read is of pstrlen field of one byte
+            this.messageReceived = new HandshakeMessage(0, "", null, null, null);
+            this.outputBuffer = null;
         }
     }
 
@@ -120,7 +128,7 @@ public class Client extends Thread {
 
         // Main loop for processing new
         // 1. connections and conducting handshakes
-        // 2. commands from client manager object b
+        // 2. commands from client manager object inputBuffer
         while(true) {
 
             // Get next channel event
@@ -154,22 +162,19 @@ public class Client extends Thread {
                             numberOfHandshakingConnections++;
                     }
 
-                    // Ready to be read
-                    if(key.isReadable()) {
-                        try {
+                    try {
+
+                        // Ready to be read
+                        if (key.isReadable())
                             read(key);
-                        } catch (IOException e) {
-                            //
-                            //
-                            //
-                            //
-                        }
+
+                        // Ready to be written to
+                        if (key.isWritable())
+                                write(key);
+
+                    } catch (IOException e) {
+                        sendEvent(new AcceptingClientFailedEvent(e));
                     }
-
-
-                    // Ready to be written to
-                    if(key.isWritable())
-                        write(key);
                 }
             }
 
@@ -228,19 +233,26 @@ public class Client extends Thread {
             return false;
         }
 
-        // Get socket channel
-        SocketChannel client = serverChannel.accept();
+       try {
 
-        // Did we manage to actually accept connection? Why may this fail?
-        // if so, signal that connection was not accepted
-        if(client == null)
-            return false;
+           // Get socket channel
+           SocketChannel client = serverChannel.accept();
 
-        // Set to non-blocking mode
-        client.configureBlocking(false);
+            // Did we manage to actually accept connection? Why may this fail?
+            // if so, signal that connection was not accepted
+            if (client == null)
+                return false;
 
-        // Register with with selector ONLY for reading
-        client.register(selector, SelectionKey.OP_READ);
+            // Set to non-blocking mode
+            client.configureBlocking(false);
+
+            // Register with with selector ONLY for reading
+            client.register(selector, SelectionKey.OP_READ);
+
+       } catch (IOException e) {
+           sendEvent(new AcceptingClientFailedEvent(e));
+           return false;
+       }
 
         // Attach state object with key
         key.attach(new HandshakeReceiverState());
@@ -262,7 +274,7 @@ public class Client extends Thread {
         SocketChannel channel = (SocketChannel)key.channel();
 
         // Handle based on stage of handshake
-        ByteBuffer b = state.b;
+        ByteBuffer b = state.inputBuffer;
 
         switch(state.s) {
 
@@ -278,10 +290,10 @@ public class Client extends Thread {
                     if(b.remaining() == 0) {
 
                         // Save pstrlen in state
-                        state.m.setPstrlen((int)b.get(0));
+                        state.messageReceived.setPstrlen((int)b.get(0));
 
                         // Set new limit to read up to and including info_hash field
-                        b.limit(1 + state.m.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
+                        b.limit(1 + state.messageReceived.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
                     }
 
                 } else { // Yes
@@ -297,24 +309,24 @@ public class Client extends Thread {
 
                         // pstr
                         int from = 1;
-                        int to = from + state.m.getPstrlen();
+                        int to = from + state.messageReceived.getPstrlen();
                         byte[] pstr = Arrays.copyOfRange(full, from, to);
-                        state.m.setPstr(pstr.toString());
+                        state.messageReceived.setPstr(pstr.toString());
 
                         // reserved
                         from = to;
                         to += Reserved.getLength();
                         byte[] reserved = Arrays.copyOfRange(full, from, to);
-                        state.m.setReserved(new Reserved(reserved));
+                        state.messageReceived.setReserved(new Reserved(reserved));
 
                         //  info_hash
                         from = to;
                         to += InfoHash.getLength();
                         byte[] info_hash = Arrays.copyOfRange(full, from, to);
-                        state.m.setInfo_hash(new InfoHash(info_hash));
+                        state.messageReceived.setInfo_hash(new InfoHash(info_hash));
 
                         // Do we serve this torrent?
-                        TorrentSwarm t = torrentSwarms.get(state.m.getInfo_hash());
+                        TorrentSwarm t = torrentSwarms.get(state.messageReceived.getInfo_hash());
                         if(t != null) {
 
                             // Can this swarm handle one more client
@@ -323,12 +335,16 @@ public class Client extends Thread {
                                 // Alter stage
                                 state.s = Stage.INFO_HASH_READ;
 
+                                // Save message we intend to save
+                                HandshakeMessage m = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(true, true), state.messageReceived.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
+                                state.outputBuffer = ByteBuffer.wrap(m.toRaw());
+
                                 // Alter interest set so that we can ONLY write our handshake
                                 key.interestOps(SelectionKey.OP_WRITE);
                             } else {
 
                                 // Send event
-                                sendEvent(new TorrentSwarmFullEvent(channel.socket().getInetAddress(), state.m.getInfo_hash()));
+                                sendEvent(new TorrentSwarmFullEvent(channel.socket().getInetAddress(), state.messageReceived.getInfo_hash()));
 
                                 // Disconnect, and therefor also automatically unregister with selector
                                 channel.close();
@@ -336,7 +352,7 @@ public class Client extends Thread {
                         } else {
 
                             // Send event
-                            sendEvent(new UnrecognizedInfoHashEvent(channel.socket().getInetAddress(), state.m.getInfo_hash()));
+                            sendEvent(new UnrecognizedInfoHashEvent(channel.socket().getInetAddress(), state.messageReceived.getInfo_hash()));
 
                             // Disconnect, and therefor also automatically unregister with selector
                             channel.close();
@@ -359,18 +375,18 @@ public class Client extends Thread {
                 if(b.remaining() == 0) {
 
                     // Save peer_id
-                    int from = 1 + state.m.getPstrlen() + Reserved.getLength() + InfoHash.getLength();
+                    int from = 1 + state.messageReceived.getPstrlen() + Reserved.getLength() + InfoHash.getLength();
                     int to = from + PeerId.getLength();
                     byte[] peer_id = Arrays.copyOfRange(b.array(), from, to);
 
                     // Save peer_id in state
-                    state.m.setPeer_id(new PeerId(peer_id));
+                    state.messageReceived.setPeer_id(new PeerId(peer_id));
 
                     // Unregister channel with this selector, will be registered in TorrentSwarm object
                     key.cancel();
 
                     // Add peer to given torrent
-                    torrentSwarms.get(state.m.getInfo_hash()).addConnection(channel, state.m);
+                    torrentSwarms.get(state.messageReceived.getInfo_hash()).addConnection(channel, state.messageReceived);
                 }
 
                 break;
@@ -382,7 +398,7 @@ public class Client extends Thread {
      * Routine for handling write opportunity on a channel
      * @param key selection key with OP_WRITE set
      */
-    private void write(SelectionKey key) {
+    private void write(SelectionKey key) throws IOException {
 
         // Recover channel state
         HandshakeReceiverState state = (HandshakeReceiverState)key.attachment();
@@ -390,20 +406,24 @@ public class Client extends Thread {
         // Recover channel
         SocketChannel channel = (SocketChannel)key.channel();
 
-        // grab the output buffer of the relevant peer
+        // Handle based on stage of handshake
+        ByteBuffer b = state.outputBuffer;
 
-        //HandshakeMessage m = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(true, true), state.m.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
-        //send m.toByteBuffer()
+        // Try to write our handshake
+        channel.write(b);
 
-        // write it out
+        // Have we written it all?
+        if(b.remaining() == 0) {
 
-        // on info hash read_, send handshake, when done set //state.setS(Stage.HANDSHAKE_SENT);
+            // Set new buffer limit to read peer_id
+            state.inputBuffer.limit(state.inputBuffer.limit() + PeerId.getLength());
 
-        // Alter state so that we can only read, in order to get peer_id
-        key.interestOps(SelectionKey.OP_READ);
+            // Alter stage
+            state.s = Stage.HANDSHAKE_SENT;
 
-        // Set new buffer limit to read peer_id
-        state.b.limit(state.b.limit() + PeerId.getLength());
+            // Alter state so that we can only read, in order to get peer_id
+            key.interestOps(SelectionKey.OP_READ);
+        }
     }
 
     /**
@@ -427,7 +447,7 @@ public class Client extends Thread {
     }
 
     /**
-     * Registers new command in queue, is called by client manager b
+     * Registers new command in queue, is called by client manager inputBuffer
      * @param c command to be registered
      */
     public void registerCommand(Command c) {

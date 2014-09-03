@@ -228,9 +228,9 @@ private synchronized processMessage(peer, PeerMessage): called by peers when the
         idling
         etc
 private createExtensionHandshakeDictionary() :is called each time a new handshake is made, and any time extensions are removed, to possibly reflect most recent state of affairs for all extensions, and that they may be disabled at any time
-        create m dictionary
+        create messageReceived dictionary
         for all i=1:Extension.length
-        m.add (i, Extension[i].getExtentionName())
+        messageReceived.add (i, Extension[i].getExtentionName())
         create flat keys
         for all i=1:Extension.length
         add( Extension[i].getFlatKeys(this))
