@@ -1,10 +1,7 @@
 package org.bittorrentj;
 
 import java.nio.channels.*;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.*;
 
 import java.nio.ByteBuffer;
 import java.net.InetSocketAddress;
@@ -56,7 +53,13 @@ public class Client extends Thread {
      * should at most last. If there are no evens at all, which is unlikely,
      * then having no threshold would cause perpetual blocking.
      */
-    private final static long SELECTOR_DELAY = 100;
+    private final static long MAX_SELECTOR_DELAY = 100;
+
+    /**
+     * The number of milliseconds in total a handshake with a new peer may take,
+     * any longer results in a disconnect.
+     */
+    private final static long MAX_HANDSHAKE_DELAY = 2000;
 
     /**
      * Stages during handshake from the perspective of the receiver of a connection
@@ -92,6 +95,12 @@ public class Client extends Thread {
         public ByteBuffer outputBuffer;
 
         /**
+         * Date and time when handshake was initiated, is used to discharge
+         * connections which do not handshake properly within a given period of time
+         */
+        public Date hanshakeBegan;
+
+        /**
          * Constructor
          */
         public HandshakeReceiverState() {
@@ -101,6 +110,7 @@ public class Client extends Thread {
             this.inputBuffer.limit(1); // Initial read is of pstrlen field of one byte
             this.messageReceived = new HandshakeMessage(0, "", null, null, null);
             this.outputBuffer = null;
+            this.hanshakeBegan = new Date();
         }
     }
 
@@ -131,52 +141,7 @@ public class Client extends Thread {
         // 2. commands from client manager object inputBuffer
         while(true) {
 
-            // Get next channel event
-            int numberOfUpdatedKeys = 0;
 
-            try {
-                numberOfUpdatedKeys = selector.select(SELECTOR_DELAY);
-            } catch(IOException e) {
-                System.out.println("what can causes us to come here????"); // <= logg later in log4j
-            }
-
-            // Process any potential channel events
-            if(numberOfUpdatedKeys > 0) {
-
-                // Iterate keys
-                Iterator i = selector.selectedKeys().iterator();
-
-                while (i.hasNext()) {
-
-                    SelectionKey key = (SelectionKey) i.next();
-
-                    // Remove from selected key set,
-                    // otherwise it sticks around even after next select() call
-                    i.remove();
-
-                    // Ready to accept new connection
-                    if (key.isAcceptable()) {
-
-                        // Try to accept connection, and keep count if we succeed
-                        if(accept(key))
-                            numberOfHandshakingConnections++;
-                    }
-
-                    try {
-
-                        // Ready to be read
-                        if (key.isReadable())
-                            read(key);
-
-                        // Ready to be written to
-                        if (key.isWritable())
-                                write(key);
-
-                    } catch (IOException e) {
-                        sendEvent(new AcceptingClientFailedEvent(e));
-                    }
-                }
-            }
 
             // Process at most one new command, if available
             processOneCommand();
@@ -289,8 +254,20 @@ public class Client extends Thread {
                     // Did we read it all?
                     if(b.remaining() == 0) {
 
+                        // Read pstrlen
+                        int pstrlen = (int)b.get(0);
+
+                        // Check that it a positive integer
+                        if(pstrlen < 1) {
+
+                            // Otherwise close channel
+                            channel.close();
+
+                            break;
+                        }
+
                         // Save pstrlen in state
-                        state.messageReceived.setPstrlen((int)b.get(0));
+                        state.messageReceived.setPstrlen(pstrlen);
 
                         // Set new limit to read up to and including info_hash field
                         b.limit(1 + state.messageReceived.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
@@ -423,6 +400,78 @@ public class Client extends Thread {
 
             // Alter state so that we can only read, in order to get peer_id
             key.interestOps(SelectionKey.OP_READ);
+        }
+    }
+
+    /**
+     * Processes the latest channel events, and manages channels
+     */
+    private void processNetwork() {
+
+        // Get next channel event
+        int numberOfUpdatedKeys = 0;
+
+        try {
+            numberOfUpdatedKeys = selector.select(MAX_SELECTOR_DELAY);
+        } catch(IOException e) {
+            System.out.println("what can causes us to come here????"); // <= logg later in log4j
+        }
+
+        // Process any potential channel events
+        if(numberOfUpdatedKeys > 0) {
+
+            // Iterate keys
+            Iterator i = selector.selectedKeys().iterator();
+
+            while (i.hasNext()) {
+
+                SelectionKey key = (SelectionKey) i.next();
+
+                // Remove from selected key set,
+                // otherwise it sticks around even after next select() call
+                i.remove();
+
+                // Ready to accept new connection
+                if (key.isAcceptable()) {
+
+                    // Try to accept connection, and keep count if we succeed
+                    if(accept(key))
+                        numberOfHandshakingConnections++;
+                }
+
+                try {
+
+                    // Ready to be read
+                    if (key.isReadable())
+                        read(key);
+
+                    // Ready to be written to
+                    if (key.isWritable())
+                        write(key);
+
+                } catch (IOException e) {
+                    sendEvent(new AcceptingClientFailedEvent(e));
+                }
+            }
+        }
+
+        // Disconnect channels which have taken to long
+        long nowDateInMs = new Date().getTime();
+
+        for(SelectionKey key : selector.keys()) {
+
+            // Recover state of handshake
+            HandshakeReceiverState state = (HandshakeReceiverState)key.attachment();
+
+            // Close if it has taken more time than upper limit
+            if(nowDateInMs - state.hanshakeBegan.getTime() > MAX_HANDSHAKE_DELAY) {
+                try {
+                    key.channel().close();
+                } catch(IOException e) {
+                    // We may end up here if channel was some how already close,
+                    // but in that case who cares.
+                }
+            }
         }
     }
 
