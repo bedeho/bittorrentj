@@ -1,6 +1,6 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.field.InfoHash;
+import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.message.field.PeerId;
 import org.bittorrentj.message.field.Reserved;
 
@@ -27,7 +27,7 @@ public class HandshakeMessage {
     /**
      * Info hash of torrent
      */
-    private InfoHash info_hash;
+    private Hash info_hash;
 
     /**
      * BEP20 Peer id of peer
@@ -44,7 +44,7 @@ public class HandshakeMessage {
      * @param peer_id
      * @throws IllegalArgumentException when pstrlen and pstr are not compatible
      */
-    public HandshakeMessage(int pstrlen, String pstr, Reserved reserved, InfoHash info_hash, PeerId peer_id) throws IllegalArgumentException {
+    public HandshakeMessage(int pstrlen, String pstr, Reserved reserved, Hash info_hash, PeerId peer_id) throws IllegalArgumentException {
 
         this.pstrlen = pstrlen;
         this.pstr = pstr;
@@ -72,7 +72,7 @@ public class HandshakeMessage {
             throw new IllegalStateException("pstrlen and pstr are not compatible");
 
         // Size of new package
-        int total_size = 1 + pstrlen + Reserved.getLength() + InfoHash.getLength() + PeerId.getLength();
+        int total_size = 1 + pstrlen + Reserved.getLength() + Hash.getLength() + PeerId.getLength();
 
         // Allocate space
         byte [] raw = new byte[total_size];
@@ -90,10 +90,10 @@ public class HandshakeMessage {
 
         // info_hash
         to += Reserved.getLength();
-        System.arraycopy(info_hash.getRaw(), 0, raw, to, InfoHash.getLength());
+        System.arraycopy(info_hash.getRaw(), 0, raw, to, Hash.getLength());
 
         // peer_id
-        to += InfoHash.getLength();
+        to += Hash.getLength();
         System.arraycopy(peer_id.getRaw(), 0, raw, to, PeerId.getLength());
 
         // Return
@@ -124,11 +124,11 @@ public class HandshakeMessage {
         this.reserved = reserved;
     }
 
-    public InfoHash getInfo_hash() {
+    public Hash getInfo_hash() {
         return info_hash;
     }
 
-    public void setInfo_hash(InfoHash info_hash) {
+    public void setInfo_hash(Hash info_hash) {
         this.info_hash = info_hash;
     }
 

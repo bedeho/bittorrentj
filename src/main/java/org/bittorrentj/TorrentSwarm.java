@@ -1,6 +1,5 @@
 package org.bittorrentj;
 
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -8,9 +7,8 @@ import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
 
-import org.bittorrentj.Connection;
 import org.bittorrentj.message.HandshakeMessage;
-import org.bittorrentj.message.field.InfoHash;
+import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.torrent.Metainfo;
 
 /**
@@ -21,7 +19,7 @@ public class TorrentSwarm extends Thread {
     /**
      * Info_hash for this torrent swarm
      */
-    private InfoHash info_hash;
+    private Hash info_hash;
 
     /**
      * Torrent file metainfo
@@ -62,7 +60,7 @@ public class TorrentSwarm extends Thread {
 
      */
 
-    public TorrentSwarm(InfoHash info_hash) {
+    public TorrentSwarm(Hash info_hash) {
 
         this.info_hash = info_hash
 

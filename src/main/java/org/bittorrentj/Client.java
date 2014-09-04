@@ -12,7 +12,7 @@ import org.bittorrentj.event.Event;
 import org.bittorrentj.event.StartServerErrorEvent;
 import org.bittorrentj.event.ToManyConnectionsEvent;
 import org.bittorrentj.message.HandshakeMessage;
-import org.bittorrentj.message.field.InfoHash;
+import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.message.field.PeerId;
 import org.bittorrentj.message.field.Reserved;
 
@@ -31,7 +31,7 @@ public class Client extends Thread {
     /**
      * Collection of torrentSwarms presently being serviced
      */
-    private HashMap<InfoHash, TorrentSwarm> torrentSwarms;
+    private HashMap<Hash, TorrentSwarm> torrentSwarms;
 
     /**
      * Socket channel used for server
@@ -80,7 +80,7 @@ public class Client extends Thread {
          * Buffer containing what has been read so far
          */
         public ByteBuffer inputBuffer;
-        private final int MAX_HANDSHAKE_MESSAGE_SIZE = 1 + 255 + Reserved.getLength() + InfoHash.getLength() + PeerId.getLength(); // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
+        private final int MAX_HANDSHAKE_MESSAGE_SIZE = 1 + 255 + Reserved.getLength() + Hash.getLength() + PeerId.getLength(); // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
 
         /**
          * Message received from peer, is filled continuously during handshake
@@ -122,7 +122,7 @@ public class Client extends Thread {
 
         this.b = b;
         this.numberOfHandshakingConnections = 0;
-        this.torrentSwarms = new HashMap<InfoHash, TorrentSwarm>();
+        this.torrentSwarms = new HashMap<Hash, TorrentSwarm>();
     }
 
     /**
@@ -270,7 +270,7 @@ public class Client extends Thread {
                         state.messageReceived.setPstrlen(pstrlen);
 
                         // Set new limit to read up to and including info_hash field
-                        b.limit(1 + state.messageReceived.getPstrlen() + Reserved.getLength() + InfoHash.getLength());
+                        b.limit(1 + state.messageReceived.getPstrlen() + Reserved.getLength() + Hash.getLength());
                     }
 
                 } else { // Yes
@@ -298,9 +298,9 @@ public class Client extends Thread {
 
                         //  info_hash
                         from = to;
-                        to += InfoHash.getLength();
+                        to += Hash.getLength();
                         byte[] info_hash = Arrays.copyOfRange(full, from, to);
-                        state.messageReceived.setInfo_hash(new InfoHash(info_hash));
+                        state.messageReceived.setInfo_hash(new Hash(info_hash));
 
                         // Do we serve this torrent?
                         TorrentSwarm t = torrentSwarms.get(state.messageReceived.getInfo_hash());
@@ -352,7 +352,7 @@ public class Client extends Thread {
                 if(b.remaining() == 0) {
 
                     // Save peer_id
-                    int from = 1 + state.messageReceived.getPstrlen() + Reserved.getLength() + InfoHash.getLength();
+                    int from = 1 + state.messageReceived.getPstrlen() + Reserved.getLength() + Hash.getLength();
                     int to = from + PeerId.getLength();
                     byte[] peer_id = Arrays.copyOfRange(b.array(), from, to);
 

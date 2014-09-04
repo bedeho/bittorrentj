@@ -1,8 +1,5 @@
 package org.bittorrentj.torrent;
 
-import org.bittorrentj.message.field.InfoHash;
-import sun.awt.image.ImageWatched;
-
 import java.util.Date;
 import java.util.LinkedList;
 
@@ -22,7 +19,7 @@ public class Metainfo {
     /**
      * The announce URL of the tracker (string)
      */
-    private String announece;
+    private String announce;
 
     /**
      * (optional) This is an extention to the official specification
@@ -61,7 +58,7 @@ public class Metainfo {
     }
 
     /**
-     *
+     * Constructor
      * @param info
      * @param announce
      * @param announce_list
@@ -72,6 +69,15 @@ public class Metainfo {
      */
     public Metainfo(Info info, String announce, LinkedList<String> announce_list, Date creation_date,  String comment, String created_by, String encoding) {
 
+        this.info = info;
+        this.announce = announce;
+        this.announce_list = announce_list;
+        this.creation_date = creation_date;
+        this.comment = comment;
+        this.created_by = created_by;
+        this.encoding = encoding;
+
         // what short of coherency check is needed
+
     }
 }

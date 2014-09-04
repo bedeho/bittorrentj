@@ -4,6 +4,8 @@ package org.bittorrentj.torrent;
  * Created by bedeho on 03.09.2014.
  */
 
+import org.bittorrentj.message.field.Hash;
+
 import java.util.LinkedList;
 
 /**
@@ -30,7 +32,7 @@ public class SingleFileInfo extends Info {
     private String md5sum;
 
     /**
-     * Constuctor
+     * Constructor
      * @param pieceLength
      * @param pieces
      * @param private_
@@ -38,7 +40,7 @@ public class SingleFileInfo extends Info {
      * @param length length of file
      * @param md5sum MD5 sum of file (optional)
      */
-    public SingleFileInfo(int pieceLength, LinkedList<String> pieces, int private_, String name, int length, String md5sum) {
+    public SingleFileInfo(int pieceLength, LinkedList<Hash> pieces, boolean private_, String name, int length, String md5sum) {
 
         super(pieceLength, pieces, private_);
 

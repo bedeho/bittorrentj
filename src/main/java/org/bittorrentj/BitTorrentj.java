@@ -3,7 +3,7 @@ package org.bittorrentj;
 import java.util.LinkedList;
 
 import org.bittorrentj.event.Event;
-import org.bittorrentj.message.field.InfoHash;
+import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.torrent.Metainfo;
 
 /**
@@ -91,11 +91,11 @@ public class BitTorrentj {
         //client.registerCommand(new AddTorrentCommand())
     }
 
-    public void removeTorrent(InfoHash h) {
+    public void removeTorrent(Hash h) {
         //client.registerCommand(new RemoveTorrentCommand())
     }
 
-    public void getTorrentState(InfoHash h) {
+    public void getTorrentState(Hash h) {
         //client.registerCommand(new GetTorrentSwarmStateCommand())
 
 
@@ -106,7 +106,7 @@ public class BitTorrentj {
         // etc
     }
 
-    public void alterTorrentSettings(InfoHash h) {
+    public void alterTorrentSettings(Hash h) {
 
     }
 

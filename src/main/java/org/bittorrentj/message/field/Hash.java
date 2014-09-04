@@ -5,31 +5,31 @@ import java.util.Arrays;
 /**
  * Created by bedeho on 30.08.2014.
  */
-public class InfoHash {
+public class Hash {
 
     /**
-     * Byte array for info_hash field
+     * Byte array for 20 byte SHA1 hash field
      */
-    private byte [] info_hash;
+    private byte [] hash;
 
     /**
      * Constructor
-     * @param info_hash in byte form
+     * @param hash in byte form
      */
-    public InfoHash(byte[] info_hash) {
+    public Hash(byte[] hash) {
 
-        if(info_hash.length != getLength())
-            throw new IllegalArgumentException("Argument had incorrect length, expected " + getLength() + ", received " + info_hash.length);
+        if(hash.length != getLength())
+            throw new IllegalArgumentException("Argument had incorrect length, expected " + getLength() + ", received " + hash.length);
         else
-            this.info_hash = info_hash;
+            this.hash = hash;
     }
 
     /**
-     * Returns byte array for info_hash field
+     * Returns byte array for hash field
      * @return byte array
      */
     public byte[] getRaw() {
-        return info_hash;
+        return hash;
     }
 
     /**
@@ -37,8 +37,8 @@ public class InfoHash {
      * @param h object to compare with
      * @return true if this object and f have identical byte arrays backing them
      */
-    public boolean equals(InfoHash h) {
-        return Arrays.equals(info_hash, h.getRaw());
+    public boolean equals(Hash h) {
+        return Arrays.equals(hash, h.getRaw());
     }
 
     /**

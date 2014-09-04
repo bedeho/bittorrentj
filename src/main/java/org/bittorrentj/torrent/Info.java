@@ -4,6 +4,8 @@ package org.bittorrentj.torrent;
  * Created by bedeho on 03.09.2014.
  */
 
+import org.bittorrentj.message.field.Hash;
+
 import java.util.LinkedList;
 
 /**
@@ -16,11 +18,12 @@ public abstract class Info {
      */
     private int pieceLength;
 
+
     /**
      *  String consisting of the concatenation of all
      *  20-byte SHA1 hash values, one per piece (byte string, i.e. not urlencoded)
      */
-    private LinkedList<String> pieces;
+    private LinkedList<Hash> pieces;
 
     /**
      *  (optional) this field is an integer.
@@ -37,10 +40,10 @@ public abstract class Info {
     /**
      * Constructor
      * @param pieceLength bytes per each piece
-     * @param pieces
+     * @param pieces list of piece hashes
      * @param private_ privateness of torrent
      */
-    public Info(int pieceLength, LinkedList<String> pieces, boolean private_) {
+    public Info(int pieceLength, LinkedList<Hash> pieces, boolean private_) {
 
         this.pieceLength = pieceLength;
         this.pieces = pieces;
@@ -63,11 +66,11 @@ public abstract class Info {
         this.pieceLength = pieceLength;
     }
 
-    public LinkedList<String> getPieces() {
+    public LinkedList<Hash> getPieces() {
         return pieces;
     }
 
-    public void setPieces(LinkedList<String> pieces) {
+    public void setPieces(LinkedList<Hash> pieces) {
         this.pieces = pieces;
     }
 }
