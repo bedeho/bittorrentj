@@ -77,7 +77,7 @@ public class Client extends Thread {
          * Buffer containing what has been read so far
          */
         public ByteBuffer inputBuffer;
-        public final static int MAX_HANDSHAKE_MESSAGE_SIZE = 304; // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
+        private final int MAX_HANDSHAKE_MESSAGE_SIZE = 1 + 255 + Reserved.getLength() + InfoHash.getLength() + PeerId.getLength(); // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
 
         /**
          * Message received from peer, is filled continuously during handshake

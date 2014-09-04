@@ -70,5 +70,4 @@ public class SingleFileInfo extends Info {
     public void setLength(int length) {
         this.length = length;
     }
-
 }
