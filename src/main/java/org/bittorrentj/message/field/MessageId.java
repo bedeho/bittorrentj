@@ -43,7 +43,7 @@ public enum MessageId {
      * @return the MessageId
      * @throws InvalidMessageIdException if rawId is not recognized
      */
-    static MessageId getMessageIdFromRaw(byte rawId) throws InvalidMessageIdException {
+    public static MessageId getMessageIdFromRaw(byte rawId) throws InvalidMessageIdException {
 
         // Look for match among values
         for(MessageId i : MessageId.values()) {

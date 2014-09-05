@@ -1,5 +1,8 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.BufferToSmallForMessageException;
+import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
+
 import java.nio.ByteBuffer;
 
 /**
@@ -19,35 +22,40 @@ public abstract class MessageWithLengthField extends Message {
     /**
      * Factory method for producing a MessageWithLengthField
      * message based of the supplied byte buffer, whose
-     * state (pos, lim, mark) is not altered.
-     * @param src
-     * @return
-     * @throws dddddd
+     * position is advanced to end of message read.
+     * @param src buffer read from
+     * @return message created
+     * @throws BufferToSmallForMessageException if buffer has no space to read length field
      */
-    public static MessageWithLengthField create(ByteBuffer src) {
+    public static MessageWithLengthField create(ByteBuffer src) throws BufferToSmallForMessageException, InvalidMessageIdException {
 
         /**
         * We confirm that length field is not greater than buffer.
         * When invoked by network read buffer, this is guaranteed not to be the case,
         * but we have to check in general.
         */
+        if(src.remaining() < LENGTH_FIELD_SIZE)
+            throw new BufferToSmallForMessageException(LENGTH_FIELD_SIZE, src);
 
-
-
-        // if length field not have space in buffer, if not, then throw exception
-
-        //
+        // Otherwise read length field
+        int messageIdAndPayloadSize = src.getInt();
 
         /**
-        * if keep alive message (len==0), if so, just return it and we are good
-        * Read length field, and check if its 0,
-        * and therefor the keep-alive message. If not,
-        * then message must have id field, and so call id message factory instead.
+        * messageIdAndPayloadSize == 0 implies that this must be a
+        * keep alive message, if so, just return such a message.
+        * If not, then message must have id field, and so call id message factory instead.
         */
-        if(src.getInt(0) == 0)
+        if(messageIdAndPayloadSize == 0)
             return new KeepAlive();
-        else
-            return MessageWithLengthAndIdField.create(src);// Message must be with id field
+        else {
+
+            // Rewind the buffer to start of length field, since this
+            // is what next factory expects
+            src.position(src.position() - LENGTH_FIELD_SIZE);
+
+            // Call factory and return result
+            return MessageWithLengthAndIdField.create(src);
+        }
     }
 
     @Override

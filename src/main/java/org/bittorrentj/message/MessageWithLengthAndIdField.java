@@ -4,7 +4,9 @@ package org.bittorrentj.message;
  * Created by bedeho on 05.09.2014.
  */
 
+import org.bittorrentj.message.exceptions.BufferToSmallForMessageException;
 import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -34,13 +36,13 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
     /**
      * Factory method for producing a MessageWithLengthField
-     * object based of the supplied byte buffer. Supplied buffer
-     * state (pos, lim, mark) is not altered.
-     * @param src
-     * @return
-     * @throws dddddd
+     * object based of the supplied byte buffer, whose
+     * position is advanced to end of message read.
+     * @param src buffer read from
+     * @return message created
+     * @throws BufferToSmallForMessageException if buffer has no space to read length field
      */
-    public static MessageWithLengthAndIdField create(ByteBuffer src){
+    public static MessageWithLengthAndIdField create(ByteBuffer src) throws BufferToSmallForMessageException, InvalidMessageIdException {
 
         /**
          * We confirm that length field is not greater than buffer.
@@ -48,9 +50,54 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
          * but we have to check in general.
          */
 
-        // is the id recognized? if yes, then call constructor for that object, if not,
-        // then throw exception
+        if(src.remaining() < LENGTH_FIELD_SIZE + ID_FIELD_SIZE)
+            throw new BufferToSmallForMessageException(LENGTH_FIELD_SIZE + ID_FIELD_SIZE, src);
 
+        // Otherwise read length field
+        int messageIdAndPayloadSize = src.getInt();
+
+        // Read raw id
+        byte rawId = src.get();
+
+        // Convert to MessageId to extract message, may
+        // case exception if not recognized
+        MessageId id = MessageId.getMessageIdFromRaw(rawId);
+
+        // Call upon correct constructor
+        switch(id) {
+            case CHOKE:
+
+                break;
+            case UNCHOKE:
+
+                break;
+            case INTERESTED:
+
+                break;
+            case NOT_INTERESTED:
+
+                break;
+            case HAVE:
+
+                break;
+            case BITFIELD:
+
+                break;
+            case REQUEST:
+
+                break;
+            case PIECE:
+
+                break;
+            case CANCEL:
+
+                break;
+            case PORT:
+                break;
+
+            case EXTENDED: // what to do here
+                break;
+        }
     }
 
     @Override
