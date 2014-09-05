@@ -25,11 +25,12 @@ public class Hash {
     }
 
     /**
-     * Returns byte array for hash field
+     * Returns byte array for hash field,
+     * altering array has no side effects on this object.
      * @return byte array
      */
     public byte[] getRaw() {
-        return hash;
+        return hash.clone();
     }
 
     /**

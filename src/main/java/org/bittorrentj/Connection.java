@@ -1,10 +1,10 @@
 package org.bittorrentj;
 
 import org.bittorrentj.message.Message;
+import org.bittorrentj.message.MessageWithLengthField;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.Date;
@@ -102,9 +102,22 @@ public class Connection {
     private final static int NETWORK_READ_BUFFER_SIZE = 10 * 1024 * 1024;
 
     /**
+     * Position in position in networkReadBuffer where data
+     * begins which has not been processed by readMessagesFromChannel() and
+     * subsequently turned into a message in readMessagesQueue
+     */
+    private int currentReadBufferPosition;
+
+    /**
      * Queue of messages which have been read but not processed
      */
     private LinkedList<Message> readMessagesQueue;
+
+
+
+
+
+    // MappedByteBuffer <-- memory mapped
 
     /**
      *
@@ -115,7 +128,9 @@ public class Connection {
         this.peerState = new PeerState(false, false);
         this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
-        this.readMessages = new LinkedList<Message>();
+        this.readMessagesQueue = new LinkedList<Message>();
+
+        this.currentReadBufferPosition = 0;
     }
 
     //private ConnectionStatistics statistics;
@@ -130,55 +145,49 @@ public class Connection {
     }
     */
 
-
     /**
      * Attempts to read from channel when OP_READ is registered
      */
     public void readMessagesFromChannel() throws IOException {
 
-        int bufferPositionBeforeRead = networkReadBuffer.position();
-
+        // Read from channel into network read buffer
         int numberOfBytesRead = channel.read(networkReadBuffer);
 
         // Each iteration reads one message from channel buffer
         while(true) {
 
-            // Do we have enough space in buffer for length field of new message,
-            // if not then we are done reading from buffer
-            if(networkReadBuffer.position() - bufferPositionBeforeRead > )
-                continue;
+            // Remaining space in buffer which has not been processed into a message
+            int remainingBufferSize = networkReadBuffer.position() - currentReadBufferPosition;
 
-            /** Read length of new message
-             *
-             */
-            messageLength
+            // Do we have enough space in buffer for length field of new message?,
+            // if not we are done reading from buffer
+            if(remainingBufferSize < MessageWithLengthField.LENGTH_FIELD_SIZE)
+                break;
 
-            /**
-             * Check that buffer does contain a full protocol message
-             * by confirming that the length field starting at bufferPositionBeforeRead
-             * is a value not exceeding the numberOfBytesRead.
-             * /
+            // Read length of new message in as four byte big-endian integer
+            int messageLength = networkReadBuffer.getInt(currentReadBufferPosition);
 
+            // make some id, or not, depends on if length == 0
 
-             /**
-             * Check that the id field after the length field is a valid bittorrent message
-             * id
-             */
+            // Check that buffer does contain a full new message,
+            // if not we are done reading from buffer
+            if(remainingBufferSize >= messageLength) // include id ?
+               break;
 
-            /**
-             * Wrap this part of the read buffer, and generate a fresh message which is
-             * inserted in readMessagesQueue
-             */
+            // Check that the id field after the length field is a valid bittorrent message id
 
-            /**
-             *
-             */
-            bufferPositionBeforeRead += messageLength;
+            // Wrap this part of the read buffer, and generate a fresh message which is
+            // inserted in readMessagesQueue
+
+            // Advance position in buffer
+            currentReadBufferPosition += messageLength;
 
 
         }
 
-        // we had to end, now what do we do
+        // if there is no un procssed ata left: then reset it so that we postpone and eventual copy event
+        // else: {
+        //          if the unprocssed data touches the end of buffer, then copy the whole thing to the start of buffer to not waste space
 
     }
 

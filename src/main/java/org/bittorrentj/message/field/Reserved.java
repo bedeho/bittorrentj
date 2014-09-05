@@ -63,11 +63,12 @@ public class Reserved {
     }
 
     /**
-     * Get byte array for reserved field. Altering array changes
+     * Get byte array for reserved field,
+     * altering array has no side effect on this object
      * @return
      */
     public byte[] getRaw() {
-        return reserved;
+        return reserved.clone();
     }
 
     /**
