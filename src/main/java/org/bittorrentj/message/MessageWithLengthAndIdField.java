@@ -24,7 +24,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
     /**
      * Id of message
      */
-    MessageId id;
+    protected MessageId id;
 
     /**
      * Id of message
@@ -44,20 +44,27 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
      */
     public static MessageWithLengthAndIdField create(ByteBuffer src) throws BufferToSmallForMessageException, InvalidMessageIdException {
 
+        // Minimum size of messages of this class
+        int minSize = LENGTH_FIELD_SIZE + ID_FIELD_SIZE;
+
         /**
          * We confirm that length field is not greater than buffer.
          * When invoked by MessageWithLengthField.create(), this is guaranteed not to be the case,
          * but we have to check in general.
          */
 
-        if(src.remaining() < LENGTH_FIELD_SIZE + ID_FIELD_SIZE)
-            throw new BufferToSmallForMessageException(LENGTH_FIELD_SIZE + ID_FIELD_SIZE, src);
+        if(src.remaining() < minSize)
+            throw new BufferToSmallForMessageException(minSize, src);
 
         // Otherwise read length field
         int messageIdAndPayloadSize = src.getInt();
 
         // Read raw id
         byte rawId = src.get();
+
+        // Rewind buffer to start of message as
+        // promised to constructors of message objects
+        src.position(src.position() - minSize);
 
         // Convert to MessageId to extract message, may
         // case exception if not recognized
@@ -66,38 +73,42 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
         // Call upon correct constructor
         switch(id) {
             case CHOKE:
-
+                return new Choke(src);
                 break;
             case UNCHOKE:
-
+                return new UnChoke(src);
                 break;
             case INTERESTED:
-
+                return new Interested(src);
                 break;
             case NOT_INTERESTED:
-
+                return new NotInterested(src);
                 break;
             case HAVE:
-
+                return new Have(src);
                 break;
             case BITFIELD:
-
+                return new BitField(src);
                 break;
             case REQUEST:
-
+                return new Request(src);
                 break;
             case PIECE:
-
+                return new Piece(src);
                 break;
             case CANCEL:
-
+                return new Cancel(src);
                 break;
             case PORT:
                 break;
-
+                return new Port(src);
             case EXTENDED: // what to do here
                 break;
         }
+    }
+
+    public MessageId getMessageId(){
+        return id;
     }
 
     @Override

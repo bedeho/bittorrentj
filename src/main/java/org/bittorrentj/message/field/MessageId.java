@@ -32,7 +32,7 @@ public enum MessageId {
      * Get wire representation of message id
      * @return
      */
-    byte getRaw() {
+    public byte getRaw() {
         return (byte)id;
     }
 
