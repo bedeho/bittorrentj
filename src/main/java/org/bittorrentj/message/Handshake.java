@@ -7,7 +7,7 @@ import org.bittorrentj.message.field.Reserved;
 /**
  * Created by bedeho on 01.09.2014.
  */
-public class HandshakeMessage {
+public class Handshake extends Message {
 
     /**
      * Length of pstr field
@@ -36,7 +36,7 @@ public class HandshakeMessage {
 
     /**
      * Constructor based on field objects. It is possible to pass null values for some or all fields,
-     * but toRaw() will then return exception.
+     * but writeRaw() will then return exception.
      * @param pstrlen
      * @param pstr
      * @param reserved
@@ -44,7 +44,7 @@ public class HandshakeMessage {
      * @param peer_id
      * @throws IllegalArgumentException when pstrlen and pstr are not compatible
      */
-    public HandshakeMessage(int pstrlen, String pstr, Reserved reserved, Hash info_hash, PeerId peer_id) throws IllegalArgumentException {
+    public Handshake(int pstrlen, String pstr, Reserved reserved, Hash info_hash, PeerId peer_id) throws IllegalArgumentException {
 
         this.pstrlen = pstrlen;
         this.pstr = pstr;
@@ -58,11 +58,12 @@ public class HandshakeMessage {
     }
 
     /**
-     * Gives the raw byte array form of the message
+     * Gives the raw byte array form of the message,
+     * altering has no effect on this object.
      * @return byte array of message
      * @throws IllegalStateException when all fields are not set, or pstrlen and pstr are not compatible
      */
-    public byte [] toRaw() throws IllegalStateException {
+    public byte [] getRaw() throws IllegalStateException {
 
         // If all fields are not set, which can be the case due to how handshake has a pause step,
         // then buffer form is not available

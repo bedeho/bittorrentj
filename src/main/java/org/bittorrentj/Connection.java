@@ -1,5 +1,6 @@
 package org.bittorrentj;
 
+import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.message.Message;
 import org.bittorrentj.message.MessageWithLengthField;
 
@@ -107,15 +108,12 @@ public class Connection {
      * subsequently turned into a message in readMessagesQueue
      */
     private int currentReadBufferPosition;
+    private int copyAtEdgeEvent; // purely a performance statistic to assess whether circluar buffer is needed
 
     /**
      * Queue of messages which have been read but not processed
      */
     private LinkedList<Message> readMessagesQueue;
-
-
-
-
 
     // MappedByteBuffer <-- memory mapped
 
@@ -131,6 +129,7 @@ public class Connection {
         this.readMessagesQueue = new LinkedList<Message>();
 
         this.currentReadBufferPosition = 0;
+        this.copyAtEdgeEvent = 0;
     }
 
     //private ConnectionStatistics statistics;
@@ -146,68 +145,80 @@ public class Connection {
     */
 
     /**
-     * Attempts to read from channel when OP_READ is registered
+     * Attempts to read from channel when OP_READ is registered,
+     * and put full messages in readMessagesQueue.
      */
-    public void readMessagesFromChannel() throws IOException {
+    public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException {
 
         // Read from channel into network read buffer
         int numberOfBytesRead = channel.read(networkReadBuffer);
 
-        // Each iteration reads one message from channel buffer
+        // Each iteration attempts to read one message from channel buffer
+
+        // Remaining space in buffer which has not been processed into a message
+        int remainingBufferSize;
+
         while(true) {
 
-            // Remaining space in buffer which has not been processed into a message
-            int remainingBufferSize = networkReadBuffer.position() - currentReadBufferPosition;
+
+            remainingBufferSize = networkReadBuffer.position() - currentReadBufferPosition;
 
             // Do we have enough space in buffer for length field of new message?,
-            // if not we are done reading from buffer
+            // if not we are done reading from buffer, and we stop without
+            // advancing buffer read position.
             if(remainingBufferSize < MessageWithLengthField.LENGTH_FIELD_SIZE)
                 break;
 
-            // Read length of new message in as four byte big-endian integer
-            int messageLength = networkReadBuffer.getInt(currentReadBufferPosition);
+            // Read length field of new message in as four byte big-endian integer
+            int messageIdAndPayloadSize = networkReadBuffer.getInt(currentReadBufferPosition);
 
-            // make some id, or not, depends on if length == 0
+            // Get total size of message as claimed by length field
+            int totalMessageSize = MessageWithLengthField.LENGTH_FIELD_SIZE + messageIdAndPayloadSize;
+
+            // Check if peer is attempting to send a message we can never process,
+            // that is a message greater than read buffer. If so we throw an exception.
+            if(totalMessageSize > NETWORK_READ_BUFFER_SIZE)
+                throw new MessageToLargeForNetworkBufferException(totalMessageSize, NETWORK_READ_BUFFER_SIZE);
 
             // Check that buffer does contain a full new message,
-            // if not we are done reading from buffer
-            if(remainingBufferSize >= messageLength) // include id ?
-               break;
+            // that is: <length><id><payload>.
+            // if not we are done reading from buffer, and we stop without
+            // advancing buffer read position.
+            if (remainingBufferSize >= totalMessageSize) {
 
-            // Check that the id field after the length field is a valid bittorrent message id
+                // Wrap in a temporary read only buffer
+                ByteBuffer temporaryBuffer = networkReadBuffer.wrap....asReadOnlyBuffer();
 
-            // Wrap this part of the read buffer, and generate a fresh message which is
-            // inserted in readMessagesQueue
+                // Generate a new message
+                MessageWithLengthField m = MessageWithLengthField.create(temporaryBuffer);
+
+                // Save message in read queue
+                readMessagesQueue.add(m);
+            }
 
             // Advance position in buffer
-            currentReadBufferPosition += messageLength;
-
-
+            currentReadBufferPosition += messageIdAndPayloadSize;
         }
 
-        // if there is no un procssed ata left: then reset it so that we postpone and eventual copy event
-        // else: {
-        //          if the unprocssed data touches the end of buffer, then copy the whole thing to the start of buffer to not waste space
+        // If buffer is completely consumed, then we reset it
+        // to postpone copy at edge event
+        if(remainingBufferSize == 0) {
+            networkReadBuffer.reset();
+            currentReadBufferPosition = 0;
+        } else if(!networkReadBuffer.hasRemaining()) {
 
+            // If unconsumed data touches buffer limit,
+            // then copy to the front of the buffer
+
+
+            copyAtEdgeEvent++;
+        }
     }
 
     /**
      * Attempts to write to channel when OP_WRITE is registered
      */
     public void writeMessagesToChannel() {
-
-    }
-
-    /**
-     * Adds a message to writing queue
-     * @param m
-     * @return
-     */
-    public boolean enqueueMessageForSending(Message m) {
-
-    }
-
-    public boolean enqueueMessageRead(Message m) {
 
     }
 

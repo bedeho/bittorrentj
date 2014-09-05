@@ -10,8 +10,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 import org.bittorrentj.event.Event;
-import org.bittorrentj.message.HandshakeMessage;
-import org.bittorrentj.message.KeepAliveMessage;
+import org.bittorrentj.message.Handshake;
+import org.bittorrentj.message.KeepAlive;
 import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.torrent.Metainfo;
 
@@ -184,7 +184,7 @@ public class TorrentSwarm extends Thread {
             if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
                 closeConnection(connection);
             else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
-                connection.enqueueMessageForSending(new KeepAliveMessage());
+                connection.enqueueMessageForSending(new KeepAlive());
         }
     }
 
@@ -224,7 +224,7 @@ public class TorrentSwarm extends Thread {
     /**
      *
      */
-    public void addConnection(SocketChannel channel, HandshakeMessage m) {
+    public void addConnection(SocketChannel channel, Handshake m) {
 
         //register channel with selector with both opread and opwrite
     }

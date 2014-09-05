@@ -11,7 +11,7 @@ import org.bittorrentj.command.Command;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.event.StartServerErrorEvent;
 import org.bittorrentj.event.ToManyConnectionsEvent;
-import org.bittorrentj.message.HandshakeMessage;
+import org.bittorrentj.message.Handshake;
 import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.message.field.PeerId;
 import org.bittorrentj.message.field.Reserved;
@@ -85,7 +85,7 @@ public class Client extends Thread {
         /**
          * Message received from peer, is filled continuously during handshake
          */
-        public HandshakeMessage messageReceived;
+        public Handshake messageReceived;
 
         /**
          * Contains message sent from from client to peer, is built just after reading info_hash.
@@ -108,7 +108,7 @@ public class Client extends Thread {
             this.s = Stage.START;
             this.readBuffer = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
             this.readBuffer.limit(1); // Initial read is of pstrlen field of one byte
-            this.messageReceived = new HandshakeMessage(0, "", null, null, null);
+            this.messageReceived = new Handshake(0, "", null, null, null);
             this.writeBuffer = null;
             this.hanshakeBegan = new Date();
         }
@@ -388,8 +388,8 @@ public class Client extends Thread {
                                 state.s = Stage.INFO_HASH_READ;
 
                                 // Save message we intend to save
-                                HandshakeMessage m = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(true, true), state.messageReceived.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
-                                state.writeBuffer = ByteBuffer.wrap(m.toRaw());
+                                Handshake m = new Handshake(19, "BitTorrent protocol", new Reserved(true, true), state.messageReceived.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
+                                state.writeBuffer = ByteBuffer.wrap(m.getRaw());
 
                                 // Alter interest set so that we can ONLY write our handshake
                                 key.interestOps(SelectionKey.OP_WRITE);
