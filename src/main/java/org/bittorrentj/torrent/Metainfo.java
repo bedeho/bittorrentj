@@ -1,5 +1,7 @@
 package org.bittorrentj.torrent;
 
+import org.bittorrentj.message.field.Hash;
+
 import java.util.Date;
 import java.util.LinkedList;
 
@@ -80,4 +82,5 @@ public class Metainfo {
         // what short of coherency check is needed
 
     }
+
 }

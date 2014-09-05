@@ -1,5 +1,14 @@
 package org.bittorrentj;
 
+import org.bittorrentj.message.Message;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+import java.util.LinkedList;
+import java.util.Date;
+
 /**
  * Created by bedeho on 30.08.2014.
  */
@@ -57,7 +66,59 @@ public class Connection {
         }
     }
 
-    private ConnectionStatistics statistics;
+    /**
+     * Date and time when data was written to channel for this connection
+     */
+    private Date timeLastDataSent;
+
+    /**
+     * Date and time when data was read from channel for this connection
+     */
+    private Date timeLastDataReceived;
+
+    /**
+     * Channel for this connection
+     */
+    private SocketChannel channel;
+
+    /**
+     * Write buffer for network
+     */
+    private ByteBuffer networkWriteBuffer;
+
+    /**
+     * Size (bytes) of networkWriteBuffer
+     */
+    private final static int NETWORK_WRITE_BUFFER_SIZE = 10 * 1024 * 1024;
+
+    /**
+     * Read buffer for network
+     */
+    private ByteBuffer networkReadBuffer;
+
+    /**
+     * Size (bytes) of networkReadBuffer
+     */
+    private final static int NETWORK_READ_BUFFER_SIZE = 10 * 1024 * 1024;
+
+    /**
+     * Queue of messages which have been read but not processed
+     */
+    private LinkedList<Message> readMessagesQueue;
+
+    /**
+     *
+     */
+    public Connection() {
+
+        this.clientState = new PeerState(false, false);
+        this.peerState = new PeerState(false, false);
+        this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
+        this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
+        this.readMessages = new LinkedList<Message>();
+    }
+
+    //private ConnectionStatistics statistics;
 
     /*
     public enum State {
@@ -68,6 +129,94 @@ public class Connection {
 
     }
     */
+
+
+    /**
+     * Attempts to read from channel when OP_READ is registered
+     */
+    public void readMessagesFromChannel() throws IOException {
+
+        int bufferPositionBeforeRead = networkReadBuffer.position();
+
+        int numberOfBytesRead = channel.read(networkReadBuffer);
+
+        // Each iteration reads one message from channel buffer
+        while(true) {
+
+            // Do we have enough space in buffer for length field of new message,
+            // if not then we are done reading from buffer
+            if(networkReadBuffer.position() - bufferPositionBeforeRead > )
+                continue;
+
+            /** Read length of new message
+             *
+             */
+            messageLength
+
+            /**
+             * Check that buffer does contain a full protocol message
+             * by confirming that the length field starting at bufferPositionBeforeRead
+             * is a value not exceeding the numberOfBytesRead.
+             * /
+
+
+             /**
+             * Check that the id field after the length field is a valid bittorrent message
+             * id
+             */
+
+            /**
+             * Wrap this part of the read buffer, and generate a fresh message which is
+             * inserted in readMessagesQueue
+             */
+
+            /**
+             *
+             */
+            bufferPositionBeforeRead += messageLength;
+
+
+        }
+
+        // we had to end, now what do we do
+
+    }
+
+    /**
+     * Attempts to write to channel when OP_WRITE is registered
+     */
+    public void writeMessagesToChannel() {
+
+    }
+
+    /**
+     * Adds a message to writing queue
+     * @param m
+     * @return
+     */
+    public boolean enqueueMessageForSending(Message m) {
+
+    }
+
+    public boolean enqueueMessageRead(Message m) {
+
+    }
+
+    public Date getTimeLastDataSent() {
+        return timeLastDataSent;
+    }
+
+    public void setTimeLastDataSent(Date timeLastDataSent) {
+        this.timeLastDataSent = timeLastDataSent;
+    }
+
+    public Date getTimeLastDataReceived() {
+        return timeLastDataReceived;
+    }
+
+    public void setTimeLastDataReceived(Date timeLastDataReceived) {
+        this.timeLastDataReceived = timeLastDataReceived;
+    }
 }
 
 /*

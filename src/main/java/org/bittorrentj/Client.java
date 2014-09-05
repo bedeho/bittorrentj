@@ -44,7 +44,7 @@ public class Client extends Thread {
     private Selector selector;
 
     /**
-     * Queue of commands issued by managing object inputBuffer
+     * Queue of commands issued by managing object readBuffer
      */
     private LinkedList<Command> commandQueue;
 
@@ -53,7 +53,7 @@ public class Client extends Thread {
      * should at most last. If there are no evens at all, which is unlikely,
      * then having no threshold would cause perpetual blocking.
      */
-    private final static long MAX_SELECTOR_DELAY = 100;
+    public final static long MAX_SELECTOR_DELAY = 100;
 
     /**
      * The number of milliseconds in total a handshake with a new peer may take,
@@ -79,7 +79,7 @@ public class Client extends Thread {
         /**
          * Buffer containing what has been read so far
          */
-        public ByteBuffer inputBuffer;
+        public ByteBuffer readBuffer;
         private final int MAX_HANDSHAKE_MESSAGE_SIZE = 1 + 255 + Reserved.getLength() + Hash.getLength() + PeerId.getLength(); // 1 + len(pstr) + 8 + 20 + 20 <= 49 + 255 = 304
 
         /**
@@ -92,7 +92,7 @@ public class Client extends Thread {
          * There is no need to keep the HandshakeMessage object around itself, since the
          * raw form is put into this buffer right away.
          */
-        public ByteBuffer outputBuffer;
+        public ByteBuffer writeBuffer;
 
         /**
          * Date and time when handshake was initiated, is used to discharge
@@ -106,10 +106,10 @@ public class Client extends Thread {
         public HandshakeReceiverState() {
 
             this.s = Stage.START;
-            this.inputBuffer = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
-            this.inputBuffer.limit(1); // Initial read is of pstrlen field of one byte
+            this.readBuffer = ByteBuffer.allocate(MAX_HANDSHAKE_MESSAGE_SIZE);
+            this.readBuffer.limit(1); // Initial read is of pstrlen field of one byte
             this.messageReceived = new HandshakeMessage(0, "", null, null, null);
-            this.outputBuffer = null;
+            this.writeBuffer = null;
             this.hanshakeBegan = new Date();
         }
     }
@@ -126,8 +126,10 @@ public class Client extends Thread {
     }
 
     /**
-     * Thread entry point where main client thread runs. It pools network selector and checks command queue
+     * Thread entry point where main client thread runs.
+     * It pools network selector and checks command queue
      */
+   @Override
     public void run() {
 
         // ALTER LATER TO SUPPORT INTERLEAVED BEGINNING AND HALTING
@@ -138,10 +140,11 @@ public class Client extends Thread {
 
         // Main loop for processing new
         // 1. connections and conducting handshakes
-        // 2. commands from client manager object inputBuffer
+        // 2. commands from client manager object readBuffer
         while(true) {
 
-
+            // Process network channel events
+            processNetwork();
 
             // Process at most one new command, if available
             processOneCommand();
@@ -227,6 +230,78 @@ public class Client extends Thread {
     }
 
     /**
+     * Processes the latest channel events, and manages channels
+     */
+    private void processNetwork() {
+
+        // Get next channel event
+        int numberOfUpdatedKeys = 0;
+
+        try {
+            numberOfUpdatedKeys = selector.select(MAX_SELECTOR_DELAY);
+        } catch(IOException e) {
+            System.out.println("what can causes us to come here????"); // <= logg later in log4j
+        }
+
+        // Process any potential channel events
+        if(numberOfUpdatedKeys > 0) {
+
+            // Iterate keys
+            Iterator i = selector.selectedKeys().iterator();
+
+            while (i.hasNext()) {
+
+                SelectionKey key = (SelectionKey) i.next();
+
+                // Remove from selected key set,
+                // otherwise it sticks around even after next select() call
+                i.remove();
+
+                // Ready to accept new connection
+                if (key.isAcceptable()) {
+
+                    // Try to accept connection, and keep count if we succeed
+                    if(accept(key))
+                        numberOfHandshakingConnections++;
+                }
+
+                try {
+
+                    // Ready to be read
+                    if (key.isReadable())
+                        read(key);
+
+                    // Ready to be written to
+                    if (key.isWritable())
+                        write(key);
+
+                } catch (IOException e) {
+                    sendEvent(new AcceptingClientFailedEvent(e));
+                }
+            }
+        }
+
+        // Disconnect channels which have taken to long
+        long nowDateInMs = new Date().getTime();
+
+        for(SelectionKey key : selector.keys()) {
+
+            // Recover state of handshake
+            HandshakeReceiverState state = (HandshakeReceiverState)key.attachment();
+
+            // Close if it has taken more time than upper limit
+            if(nowDateInMs - state.hanshakeBegan.getTime() > MAX_HANDSHAKE_DELAY) {
+                try {
+                    key.channel().close();
+                } catch(IOException e) {
+                    // We may end up here if channel was some how already close,
+                    // but in that case who cares.
+                }
+            }
+        }
+    }
+
+    /**
      * Routine for handling read opportunity on a channel
      * @param key selection key with OP_READ set
      */
@@ -239,7 +314,7 @@ public class Client extends Thread {
         SocketChannel channel = (SocketChannel)key.channel();
 
         // Handle based on stage of handshake
-        ByteBuffer b = state.inputBuffer;
+        ByteBuffer b = state.readBuffer;
 
         switch(state.s) {
 
@@ -314,7 +389,7 @@ public class Client extends Thread {
 
                                 // Save message we intend to save
                                 HandshakeMessage m = new HandshakeMessage(19, "BitTorrent protocol", new Reserved(true, true), state.messageReceived.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
-                                state.outputBuffer = ByteBuffer.wrap(m.toRaw());
+                                state.writeBuffer = ByteBuffer.wrap(m.toRaw());
 
                                 // Alter interest set so that we can ONLY write our handshake
                                 key.interestOps(SelectionKey.OP_WRITE);
@@ -384,7 +459,7 @@ public class Client extends Thread {
         SocketChannel channel = (SocketChannel)key.channel();
 
         // Handle based on stage of handshake
-        ByteBuffer b = state.outputBuffer;
+        ByteBuffer b = state.writeBuffer;
 
         // Try to write our handshake
         channel.write(b);
@@ -393,85 +468,13 @@ public class Client extends Thread {
         if(b.remaining() == 0) {
 
             // Set new buffer limit to read peer_id
-            state.inputBuffer.limit(state.inputBuffer.limit() + PeerId.getLength());
+            state.readBuffer.limit(state.readBuffer.limit() + PeerId.getLength());
 
             // Alter stage
             state.s = Stage.HANDSHAKE_SENT;
 
             // Alter state so that we can only read, in order to get peer_id
             key.interestOps(SelectionKey.OP_READ);
-        }
-    }
-
-    /**
-     * Processes the latest channel events, and manages channels
-     */
-    private void processNetwork() {
-
-        // Get next channel event
-        int numberOfUpdatedKeys = 0;
-
-        try {
-            numberOfUpdatedKeys = selector.select(MAX_SELECTOR_DELAY);
-        } catch(IOException e) {
-            System.out.println("what can causes us to come here????"); // <= logg later in log4j
-        }
-
-        // Process any potential channel events
-        if(numberOfUpdatedKeys > 0) {
-
-            // Iterate keys
-            Iterator i = selector.selectedKeys().iterator();
-
-            while (i.hasNext()) {
-
-                SelectionKey key = (SelectionKey) i.next();
-
-                // Remove from selected key set,
-                // otherwise it sticks around even after next select() call
-                i.remove();
-
-                // Ready to accept new connection
-                if (key.isAcceptable()) {
-
-                    // Try to accept connection, and keep count if we succeed
-                    if(accept(key))
-                        numberOfHandshakingConnections++;
-                }
-
-                try {
-
-                    // Ready to be read
-                    if (key.isReadable())
-                        read(key);
-
-                    // Ready to be written to
-                    if (key.isWritable())
-                        write(key);
-
-                } catch (IOException e) {
-                    sendEvent(new AcceptingClientFailedEvent(e));
-                }
-            }
-        }
-
-        // Disconnect channels which have taken to long
-        long nowDateInMs = new Date().getTime();
-
-        for(SelectionKey key : selector.keys()) {
-
-            // Recover state of handshake
-            HandshakeReceiverState state = (HandshakeReceiverState)key.attachment();
-
-            // Close if it has taken more time than upper limit
-            if(nowDateInMs - state.hanshakeBegan.getTime() > MAX_HANDSHAKE_DELAY) {
-                try {
-                    key.channel().close();
-                } catch(IOException e) {
-                    // We may end up here if channel was some how already close,
-                    // but in that case who cares.
-                }
-            }
         }
     }
 
@@ -496,7 +499,7 @@ public class Client extends Thread {
     }
 
     /**
-     * Registers new command in queue, is called by client manager inputBuffer
+     * Registers new command in queue, is called by client manager readBuffer
      * @param c command to be registered
      */
     public void registerCommand(Command c) {
@@ -532,5 +535,14 @@ public class Client extends Thread {
      */
     private void sendEvent(Event e) {
         b.registerEvent(e);
+    }
+
+    /**
+     * Getter routine used by TorrentSwarm objects to send message
+     * to manager
+     * @return manager
+     */
+    public BitTorrentj getB() {
+        return b;
     }
 }

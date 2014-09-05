@@ -73,4 +73,6 @@ public abstract class Info {
     public void setPieces(LinkedList<Hash> pieces) {
         this.pieces = pieces;
     }
+
+    abstract public Hash computeInfoHash();
 }

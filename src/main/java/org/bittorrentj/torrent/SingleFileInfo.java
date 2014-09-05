@@ -72,4 +72,10 @@ public class SingleFileInfo extends Info {
     public void setLength(int length) {
         this.length = length;
     }
+
+    @Override
+    public Info computeInfoHash() {
+        // Generate info hash
+        return null;
+    }
 }

@@ -1,13 +1,17 @@
 package org.bittorrentj;
 
-import java.nio.ByteBuffer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import org.bittorrentj.event.Event;
 import org.bittorrentj.message.HandshakeMessage;
+import org.bittorrentj.message.KeepAliveMessage;
 import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.torrent.Metainfo;
 
@@ -17,7 +21,12 @@ import org.bittorrentj.torrent.Metainfo;
 public class TorrentSwarm extends Thread {
 
     /**
-     * Info_hash for this torrent swarm
+     * Multiplexing selector for swarm connectivity
+     */
+    private Selector selector;
+
+    /**
+     * Info_hash for this torrent of corresponding to this torrent swarm
      */
     private Hash info_hash;
 
@@ -39,114 +48,148 @@ public class TorrentSwarm extends Thread {
     /**
      * Maps IP:Port to corresponding connection object
      */
-    private HashMap<String, Connection> connections;
+    private HashMap<InetSocketAddress, Connection> connections;
+
+    /**
+     * There maximum number of connections allowed for this torrent swarm
+     */
+    private int maxNumberOfConnections;
+
+    private int maxNumberOfUploads;
+
+    private int maxUploadSpeed;
+
+    private MetaInfo mInfo;
+
+    private Hash info_hash;
+
+    /**
+     * Maximum amount of time (ms) before no data from peer
+     * results in disconnecting it
+     */
+    private final static int MAX_SILENCE_DURATION = 3600*1000;
+
+    /**
+     * If time from last sending of any data to peer exceeds this
+     * a amount of time (ms), then send a keep-alive message.
+     *
+     * Wiki says:  Peers may close a connection if they receive no
+     * messages (keep-alive or any other message) for a certain period of time,
+     * so a keep-alive message must be sent to maintain the connection alive
+     * if no command have been sent for a given amount of time.
+     * This amount of time is generally two minutes.
+     */
+    private final static int KEEP_ALIVE_INTERVAL = 60*1000;
 
     // diskworker?
-    /*
-    fields
-
-
-
-
-
-        settings?
-
-
-        constructor(int maxNumberOfConnections, int minimumNumberOfConnections, int maxNumberOfUploads, int max, ArrayList<Extension>,CallBackHandler, [magnet link or Metainfo]): typically called by BitTorrentj addTorrent()
-
-        register torrent with extensions, for all i=1:Extension.length
-
-        confirms magnet link validity if present
-
-     */
 
     public TorrentSwarm(Hash info_hash) {
 
-        this.info_hash = info_hash
+        // who gets peers? Client or swarm?
+        // dht must be in client I think????
+        // PEX here?
+
+        this.info_hash = info_hash;
+
+        try {
+            this.selector = Selector.open();
+        } catch (IOException e) {
+            System.out.println("How can we possibly end up here"); // log later or something
+        }
 
                 //Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
     }
 
-    TorrentSwarm() {
+    @Override
+    public void run() {
 
-        // Event loop
         while(true) {
 
-            // Block until socket event is generated, or we are interreupted for some reason
-            try {
-                selector.select();
-            } catch() {
+            // how to stop???
 
-            }
+            // Process network channel events
+            processNetwork();
 
-            // Iterate keys
+        }
+    }
+
+    private void processNetwork() {
+
+        // Get next channel event
+        int numberOfUpdatedKeys = 0;
+
+        try {
+            numberOfUpdatedKeys = selector.select(Client.MAX_SELECTOR_DELAY);
+        } catch(IOException e) {
+            System.out.println("what can causes us to come here????"); // <= logg later in log4j
+        }
+
+        // Process any potential channel events
+        if(numberOfUpdatedKeys > 0) {
+
+            // Iterate keys and process read/write events
             Iterator i = selector.selectedKeys().iterator();
 
-            while(i.hasNext()) {
+            while (i.hasNext()) {
 
                 SelectionKey key = (SelectionKey) i.next();
 
-                // Remove from selected key set
-                i.remove();
+                try {
 
-                // Ready to accept new connection
-                if (key.isAcceptable())
-                    accept();
+                    // Get connection
+                    Connection connection = (Connection)key.attachment();
 
-                // Ready to be read
-                if (key.isReadable())
-                    read(key);
+                    // Ready to be read
+                    if (key.isReadable())
+                        connection.readMessagesFromChannel();
 
-                // Ready to be written to
-                if(key.isWritable())
-                    write(key);
+                    // Ready to be written to
+                    if (key.isWritable())
+                        connection.writeMessagesToChannel();
+
+                } catch (IOException e) {
+                    sendEvent(new ClientIOFailedEvent(e));
+
+                    // remove from hashmap, do we even need hashmap on top of selecter key set?
+                }
             }
 
-            // LOOK AT MESSAGE WHICH MAY HAVE ARRIVED FROM BITTORRENTJ
-            // concurrentlist.size() > 0 --> something to do
+            // Process each connection, and remove key from selected key set
+            i = selector.selectedKeys().iterator();
 
+            while (i.hasNext()) {
+
+                SelectionKey key = (SelectionKey) i.next();
+
+                // Remove from selected key set,
+                // otherwise it sticks around even after next select() call
+                i.remove();
+
+                // Process channel
+                processNetworkEvents(key);
+            }
         }
 
+        // Disconnect connections which have taken to long to talk to us,
+        // send keep-alive if we have not written anything in a while
+        long nowDateInMs = new Date().getTime();
 
-    }
+        for(SelectionKey key : selector.keys()) {
 
+            // Get connection
+            Connection connection = (Connection)key.attachment();
 
-    /**
-     *
-     * @param key
-     */
-    private void read(SelectionKey key) {
-
-        // get the correct peer
-
-        // put data in input buffer
-
-        // call processing routine for peer
-
-        SocketChannel client = (SocketChannel) key.channel();
-
-        // Read byte coming from the client
-        int BUFFER_SIZE = 32;
-        ByteBuffer buffer = ByteBuffer.allocate(BUFFER_SIZE);
-        try {
-            client.read(buffer);
-        }
-        catch (Exception e) {
-            // client is no longer active
-            e.printStackTrace();
-            continue;
+            // Close if it has taken more time than upper limit,
+            // otherwise send keep-alive if we have not written in a while
+            if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
+                closeConnection(connection);
+            else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
+                connection.enqueueMessageForSending(new KeepAliveMessage());
         }
     }
 
-    /**
-     *
-     * @param key
-     */
-    private void write(SelectionKey key) {
-
-        // grab the output buffer of the relevant peer
-
-        // write it out
+    // Does something when there is some channel read/write event
+    private void processNetworkEvents(SelectionKey key) {
 
     }
 
@@ -156,8 +199,12 @@ public class TorrentSwarm extends Thread {
      */
     int getNumberOfPeers() {
 
-        // needs to be synched?
-
+        // more complicated?
+        /*
+        synchronized (connections) {
+            return connections.size();
+        }
+        */
     }
 
     /**
@@ -166,6 +213,12 @@ public class TorrentSwarm extends Thread {
      */
     boolean acceptsMoreConnections() {
 
+        // complicated, think more about later
+        /*
+        synchronized (connections) {
+            return connections.size() > maxNumberOfConnections;
+        }
+        */
     }
 
     /**
@@ -176,11 +229,18 @@ public class TorrentSwarm extends Thread {
         //register channel with selector with both opread and opwrite
     }
 
+    public void closeConnection(Connection connection) {
+
+        // called from process*Netowrk, but perhaps also from Client
+        // in response to command, figure this out, and whether we need
+        // synching. this informs whetehr routine should be public or private
+    }
+
     /**
      *
      * @return
      */
-    public list getConnections() {
+    public void getConnections() {
 
     }
 
@@ -188,24 +248,30 @@ public class TorrentSwarm extends Thread {
      *
      * @return
      */
-    public Connection getConnection() {
+    public ConnectionInformation getConnectionInformation() {
 
     }
 
     /**
      *
      */
-    public void removeConnection() {
+    public void removeConnection(InetSocketAddress address) {
 
+        // complicated
+
+    }
+
+    /**
+     * Registers and event with the management object
+     * @param e
+     */
+    private void sendEvent(Event e) {
+        client.getB().registerEvent(e);
     }
 }
 /*
 
-synchronized begin() : called from BitTorrentj addTorrent in fresh thread, or begin() from BitTorrentj
-        Check that we arent already running??
 
-        MUST BE ABLE TO RECOVER FROM SAVED FILE, ALSO USING FAST FILE CHECKING ROUTINE
-        CREATE file thread????
 
 
         do we have peers??? reconnect?

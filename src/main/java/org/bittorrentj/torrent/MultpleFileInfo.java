@@ -79,4 +79,10 @@ public class MultpleFileInfo extends Info {
         this.name = name;
         this.files = files;
     }
+
+    @Override
+    public Info computeInfoHash() {
+            // Generate info hash
+            return null;
+    }
 }
