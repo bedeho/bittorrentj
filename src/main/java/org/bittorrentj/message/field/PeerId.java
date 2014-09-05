@@ -17,6 +17,12 @@ public enum PeerId {
     AZUREUS("Azureus", "-AZ"),
     UNKNOWN("Unknown", "");
 
+    /**
+     * UNKNOWN is included since there are so many peer id formats and peers that
+     * we will likely never support them all, hence an exception makes semantically
+     * little sence, given that the id is likely valid.
+     */
+
     private final String name;
     private final String peerIdPrefix;
 
@@ -34,13 +40,13 @@ public enum PeerId {
     }
 
     /**
-     * Converts raw type to the corresponding PeerType
+     * Converts raw representation to the corresponding PeerType
      * by matching prefix of type against table of prefixes.
      * If no match is found, then PeerType.UNKNOWN is returned.
      * @param peer_id matched PeerType
      * @return
      */
-    static PeerId getPeerType(byte[] peer_id) {
+    static PeerId getPeerIdFromRaw(byte[] peer_id) {
 
         String peer_id_string = peer_id.toString();
 
