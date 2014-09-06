@@ -1,6 +1,9 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.IncorrectIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -19,9 +22,25 @@ public class Have extends MessageWithLengthAndIdField {
      * @param pieceIndex zero based piece index
      */
     public Have(int pieceIndex) {
+        super(MessageId.HAVE);
 
-        this.id = MessageId.HAVE;
         this.pieceIndex = pieceIndex;
+    }
+
+    /**
+     * Constructor based of raw wire representation in buffer
+     * @param src buffer
+     * @throws IncorrectLengthFieldInMessageException when length field does not match computed message length
+     * @throws InvalidMessageIdException when id does not match have message id
+     * @throws IncorrectIdFieldInMessageException when id field is invalid
+     */
+    public Have(ByteBuffer src) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException {
+
+        // Read and process length and id fields
+        super(MessageId.NOT_INTERESTED, src);
+
+        // Read piece index
+        this.pieceIndex = src.getInt();
     }
 
     public int getPieceIndex() {
@@ -33,17 +52,12 @@ public class Have extends MessageWithLengthAndIdField {
     }
 
     @Override
-    public int getRawLength() {
-        return LENGTH_FIELD_SIZE + ID_FIELD_SIZE + 4;
+    protected void writePayloadToBuffer(ByteBuffer dst) {
+        dst.putInt(pieceIndex); // Write piece index
     }
 
     @Override
-    protected int writeMessageToBuffer(ByteBuffer dst) {
-
-        // Write to buffer, and advance position
-        dst.putInt(getRawLength()).put(id.getRaw()).putInt(pieceIndex);
-
-        // Return number of bytes
-        return getRawLength();
+    int getRawPayloadLength() {
+        return 4;
     }
 }

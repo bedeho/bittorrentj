@@ -36,7 +36,7 @@ public class Handshake extends Message {
 
     /**
      * Constructor based on field objects. It is possible to pass null values for some or all fields,
-     * but writeRaw() will then return exception.
+     * but writeRawMessage() will then return exception.
      * @param pstrlen
      * @param pstr
      * @param reserved
@@ -63,7 +63,7 @@ public class Handshake extends Message {
      * @return byte array of message
      * @throws IllegalStateException when all fields are not set, or pstrlen and pstr are not compatible
      */
-    public byte [] getRaw() throws IllegalStateException {
+    public byte [] getRawMessage() throws IllegalStateException {
 
         // If all fields are not set, which can be the case due to how handshake has a pause step,
         // then buffer form is not available
@@ -99,6 +99,10 @@ public class Handshake extends Message {
 
         // Return
         return raw;
+    }
+
+    public int getRawMessageLength() {
+
     }
 
     public int getPstrlen() {

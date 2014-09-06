@@ -389,7 +389,7 @@ public class Client extends Thread {
 
                                 // Save message we intend to save
                                 Handshake m = new Handshake(19, "BitTorrent protocol", new Reserved(true, true), state.messageReceived.getInfoHash(), new PeerId(PeerId.PeerType.BitSwapr));
-                                state.writeBuffer = ByteBuffer.wrap(m.getRaw());
+                                state.writeBuffer = ByteBuffer.wrap(m.getRawMessage());
 
                                 // Alter interest set so that we can ONLY write our handshake
                                 key.interestOps(SelectionKey.OP_WRITE);

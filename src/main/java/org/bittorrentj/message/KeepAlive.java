@@ -1,6 +1,7 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.BufferToSmallForMessageException;
+import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
+import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -9,19 +10,30 @@ import java.nio.ByteBuffer;
  */
 public class KeepAlive extends MessageWithLengthField {
 
+    /**
+     * Constructor based on binary buffer, position
+     * is left at the end of the message just read.
+     * Not clear why anyone would ever use this constructor
+     * directly, given that it requires peeking a head
+     * in buffer, but we have it anyway.
+     * @param src buffer containing raw wire form of message
+     * @throws IncorrectLengthFieldInMessageException
+     */
+    public KeepAlive(ByteBuffer src) throws InvalidMessageIdException,IncorrectLengthFieldInMessageException {
+        super(src);
+    }
+
+    /**
+     * Default constructor, is required since creating a
+     * keep alive message directly requires no arguments
+     */
+    public KeepAlive() {}
+
     @Override
-    public int getRawLength() {
-        return LENGTH_FIELD_SIZE;
+    public int getRawIdAndPayloadLength() {
+        return 0;
     }
 
     @Override
-    protected int writeMessageToBuffer(ByteBuffer dst) {
-
-        // Write length field as one four byte big-endian int to buffer,
-        // and position is advanced
-        dst.putInt(getRawLength());
-
-        // Return number of bytes written
-        return getRawLength();
-    }
+    protected void writeIdAndPayloadToBuffer(ByteBuffer dst) { } // no payload
 }

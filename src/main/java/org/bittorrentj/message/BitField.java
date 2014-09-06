@@ -1,6 +1,9 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.IncorrectIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -15,30 +18,48 @@ public class BitField extends MessageWithLengthAndIdField {
     private boolean[] bitfield;
 
     /**
-     * Constructor
+     * The number of pieces this bifield is supposed to represent
+     */
+    private int numberOfPieces;
+
+    /**
+     * Constructor based on boolean array representation of
+     * bitfield, the length of which matches exactly the
+     * number of pieces the bitfield represents. I.e,
+     * trailing overflow bits are not represented
      * @param bitfield bitfield for this message
      */
-    public BitField(boolean[] bitfield) {
+    public BitField(boolean[] bitfield, int numberOfPieces) {
 
         this.id = MessageId.BITFIELD;
         this.bitfield = bitfield;
-    }
 
-    // Do I need both.....??
-    public BitField(byte[] bitfield) {
 
     }
 
+    public BitField(ByteBuffer src) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException {
+
+        // Read and process length and id fields
+        super(MessageId.BITFIELD, src);
+
+        // Read piece index
+        this.bitfield = zzzz(src.getInt());
+
+    }
 
     public boolean getPieceAvailability(int pieceIndex) {
         return bitfield[pieceIndex];
+    }
+
+    public int getNumberOfPieces() {
+        return numberOfPieces;
     }
 
     /**
      * Computes number of bytes requried in raw
      * wire representation of bitfield property.
      * Notice: Does not give size of BitField message itself,
-     * use getRawLength() for this.
+     * use getRawMessageLength() for this.
      * @return
      */
     public int getLengthOfOnlyBitField() {
@@ -46,31 +67,36 @@ public class BitField extends MessageWithLengthAndIdField {
     }
 
     @Override
-    public int getRawLength() {
+    public int getRawMessageLength() {
         return LENGTH_FIELD_SIZE + ID_FIELD_SIZE + getLengthOfOnlyBitField(); // round up to nearest byte
     }
 
     @Override
-    protected int writeMessageToBuffer(ByteBuffer dst) {
+    protected void writeMessageToBuffer(ByteBuffer dst) {
 
         // Write to buffer, and advance position
-        dst.putInt(getRawLength()).put(id.getRaw());
+        dst.putInt(getRawMessageLength()).put(id.getRaw());
 
-        // Convert to binary bitfield
+        // Convert to byte bitfield, first allocate space with all zeros
         byte [] binaryBitfield = new byte[getLengthOfOnlyBitField()];
 
         for(int i = 0;i < bitfield.length;i++) {
 
-            int byteLocationOfThisBitInBinaryBitField = (int)Math.floor(i/8);
+            // If given bit is set, then set it in binary field as well
+            if(bitfield[i]) {
 
+                // To which byte in the binary bitfield does this (i'th) bit correspond
+                int byteLocation = (int) Math.floor((i + 1) / 8);
 
+                // To which bit location within the given byteLocation does this (i'th) bit correspond
+                int bitLocationWithinByte = i % 8;
 
-
+                // Set bit
+                binaryBitfield[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));
+            }
         }
 
-        dst.put(....)
-
-        // Return number of bytes
-        return getRawLength();
+        // Write byte representation of bitfield
+        dst.put(binaryBitfield);
     }
 }

@@ -1,6 +1,9 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.IncorrectIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -9,22 +12,30 @@ import java.nio.ByteBuffer;
  */
 public class NotInterested extends MessageWithLengthAndIdField {
 
+    /**
+     * Constructor based off raw wire representation in buffer
+     * @param src
+     * @throws IncorrectLengthFieldInMessageException when length field does not match computed message length
+     * @throws InvalidMessageIdException when id does not match NOT_INTERESTED message id
+     * @throws IncorrectIdFieldInMessageException when id field is invalid
+     */
+    public NotInterested(ByteBuffer src) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException {
+        // Read and process length and id fields
+        super(MessageId.NOT_INTERESTED, src);
+    }
+
+    /**
+     * Constructor
+     */
     public NotInterested() {
-        this.id = MessageId.NOT_INTERESTED;
+        super(MessageId.NOT_INTERESTED);
     }
 
     @Override
-    public int getRawLength() {
-        return LENGTH_FIELD_SIZE + ID_FIELD_SIZE;
-    }
+    protected void writePayloadToBuffer(ByteBuffer dst) { } // no payload
 
     @Override
-    protected int writeMessageToBuffer(ByteBuffer dst) {
-
-        // Write to buffer, and advance position
-        dst.putInt(getRawLength()).put(id.getRaw());
-
-        // Return number of bytes
-        return getRawLength();
+    int getRawPayloadLength() {
+        return 0;
     }
 }

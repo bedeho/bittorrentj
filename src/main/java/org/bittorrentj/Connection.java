@@ -132,18 +132,6 @@ public class Connection {
         this.copyAtEdgeEvent = 0;
     }
 
-    //private ConnectionStatistics statistics;
-
-    /*
-    public enum State {
-        BEFORE_HANDSHAKE(1),
-    }
-
-    public enum bufferState {
-
-    }
-    */
-
     /**
      * Attempts to read from channel when OP_READ is registered,
      * and put full messages in readMessagesQueue.
@@ -154,13 +142,10 @@ public class Connection {
         int numberOfBytesRead = channel.read(networkReadBuffer);
 
         // Each iteration attempts to read one message from channel buffer
-
-        // Remaining space in buffer which has not been processed into a message
         int remainingBufferSize;
-
         while(true) {
 
-
+            // Remaining space in buffer which has not been processed into a message
             remainingBufferSize = networkReadBuffer.position() - currentReadBufferPosition;
 
             // Do we have enough space in buffer for length field of new message?,
@@ -210,6 +195,7 @@ public class Connection {
             // If unconsumed data touches buffer limit,
             // then copy to the front of the buffer
 
+            do_copying_here
 
             copyAtEdgeEvent++;
         }
