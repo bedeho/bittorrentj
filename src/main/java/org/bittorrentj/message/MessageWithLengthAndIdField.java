@@ -144,7 +144,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
     @Override
     public int getRawIdAndPayloadLength() {
-        return ID_FIELD_SIZE + getRawPayloadLength();
+        return ID_FIELD_SIZE +  ();
     }
 
     @Override

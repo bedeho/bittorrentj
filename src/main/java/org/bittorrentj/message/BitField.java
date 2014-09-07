@@ -2,6 +2,7 @@ package org.bittorrentj.message;
 
 import org.bittorrentj.message.exceptions.IncorrectIdFieldInMessageException;
 import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
+import org.bittorrentj.message.exceptions.InvalidBitFieldLengthInBitFieldMessageException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
 
@@ -18,33 +19,29 @@ public class BitField extends MessageWithLengthAndIdField {
     private boolean[] bitfield;
 
     /**
-     * The number of pieces this bifield is supposed to represent
-     */
-    private int numberOfPieces;
-
-    /**
      * Constructor based on boolean array representation of
      * bitfield, the length of which matches exactly the
      * number of pieces the bitfield represents. I.e,
      * trailing overflow bits are not represented
      * @param bitfield bitfield for this message
      */
-    public BitField(boolean[] bitfield, int numberOfPieces) {
+    public BitField(boolean[] bitfield) {
+        super(MessageId.BITFIELD);
 
-        this.id = MessageId.BITFIELD;
         this.bitfield = bitfield;
-
-
     }
 
-    public BitField(ByteBuffer src) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException {
+    public BitField(ByteBuffer src, int numberOfPiecesInTorrent) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException, InvalidBitFieldLengthInBitFieldMessageException {
 
         // Read and process length and id fields
         super(MessageId.BITFIELD, src);
 
         // Read piece index
-        this.bitfield = zzzz(src.getInt());
+        this.bitfield = ...zzzz(src.getInt());
 
+        // Check that bitfield
+        if(bitfield.length != numberOfPiecesInTorrent)
+            throw new InvalidBitFieldLengthInBitFieldMessageException(bitfield.length, numberOfPiecesInTorrent);
     }
 
     public boolean getPieceAvailability(int pieceIndex) {
@@ -52,7 +49,7 @@ public class BitField extends MessageWithLengthAndIdField {
     }
 
     public int getNumberOfPieces() {
-        return numberOfPieces;
+        return bitfield.length;
     }
 
     /**
