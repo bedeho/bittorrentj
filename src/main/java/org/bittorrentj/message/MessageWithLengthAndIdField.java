@@ -135,12 +135,12 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
     }
 
     @Override
-    public int getRawIdAndPayloadLength() {
+    final public int getRawIdAndPayloadLength() {
         return ID_FIELD_SIZE + getRawPayloadLength();
     }
 
     @Override
-    protected void writeIdAndPayloadToBuffer(ByteBuffer dst) {
+    final protected void writeIdAndPayloadToBuffer(ByteBuffer dst) {
 
         // Write id field
         dst.put(id.getRaw());

@@ -24,7 +24,7 @@ public abstract class Message {
      * has no effect on this object.
      * @return wire representation of message as ByteBuffer
      */
-    public ByteBuffer getRawMessage() {
+    final public ByteBuffer getRawMessage() {
 
         // Allocate fresh buffer of correct size
         ByteBuffer b = ByteBuffer.allocate(getRawMessageLength());

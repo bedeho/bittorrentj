@@ -31,7 +31,7 @@ public class Interested extends MessageWithLengthAndIdField {
     protected void writePayloadToBuffer(ByteBuffer dst) { } // payload
 
     @Override
-    int getRawPayloadLength() {
+    public int getRawPayloadLength() {
         return 0;
     }
 }

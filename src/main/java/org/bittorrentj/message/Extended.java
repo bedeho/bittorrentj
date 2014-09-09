@@ -1,5 +1,11 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
+import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
+
+import java.nio.ByteBuffer;
+
 /**
  * Created by bedeho on 05.09.2014.
  */
@@ -15,4 +21,49 @@ public abstract class Extended extends MessageWithLengthAndIdField {
      * handshake message.
      */
     private int extendedMessageId;
+
+    /**
+     * Constructor based on raw wire representation.
+     * @param src buffer
+     * @throws UnrecognizedMessageIdException when id does not match CHOKE message id
+     * @throws NonMatchingIdFieldInMessageException when id field is invalid
+     */
+    public Extended(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+        super(MessageId.EXTENDED, src);
+
+        this.extendedMessageId = src.getInt();
+    }
+
+    public Extended(int extendedMessageId) {
+        super(MessageId.EXTENDED);
+
+        this.extendedMessageId = extendedMessageId;
+    }
+
+    @Override
+    final protected void writePayloadToBuffer(ByteBuffer dst) {
+
+        // Write extended message id
+        dst.putInt(extendedMessageId);
+
+        // Write rest of extended message.
+        writeExtendedMessagePayloadToBuffer(dst);
+    }
+
+    /**
+     * Writes wire representation of payload in extended message to buffer.
+     * @param dst buffer
+     */
+    abstract protected void writeExtendedMessagePayloadToBuffer(ByteBuffer dst);
+
+    @Override
+    public final int getRawPayloadLength() {
+        return EXTENDED_ID_FIELD_SIZE + getExtendedMessagePayloadLength();
+    }
+
+    /**
+     * Byte length of wire representation of payload in extended message.
+     * @return
+     */
+    abstract protected int getExtendedMessagePayloadLength();
 }

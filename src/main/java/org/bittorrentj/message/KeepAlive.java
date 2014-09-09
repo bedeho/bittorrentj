@@ -35,5 +35,5 @@ public class KeepAlive extends MessageWithLengthField {
     }
 
     @Override
-    protected void writeIdAndPayloadToBuffer(ByteBuffer dst) { } // no payload
+    public void writeIdAndPayloadToBuffer(ByteBuffer dst) { } // no payload
 }

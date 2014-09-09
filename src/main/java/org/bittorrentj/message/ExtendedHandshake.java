@@ -1,5 +1,6 @@
 package org.bittorrentj.message;
 
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 /**
@@ -19,6 +20,16 @@ public class ExtendedHandshake extends Extended {
      * i.e. The IDs are local to this particular peer.
      */
     HashMap<Integer,String> m;
+
+    @Override
+    public void writeExtendedMessagePayloadToBuffer(ByteBuffer dst){
+
+    }
+
+    @Override
+    protected int getExtendedMessagePayloadLength() {
+
+    }
 
 
 }

@@ -15,11 +15,10 @@ public class NotInterested extends MessageWithLengthAndIdField {
     /**
      * Constructor based off raw wire representation in buffer
      * @param src
-     * @throws IncorrectLengthFieldInMessageException when length field does not match computed message length
-     * @throws org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException when id does not match NOT_INTERESTED message id
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException when id field is invalid
+     * @throws UnrecognizedMessageIdException when id does not match NOT_INTERESTED message id
+     * @throws NonMatchingIdFieldInMessageException when id field is invalid
      */
-    public NotInterested(ByteBuffer src) throws IncorrectLengthFieldInMessageException, UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+    public NotInterested(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
         super(MessageId.NOT_INTERESTED, src); // Read and process length and id fields
     }
 
@@ -31,7 +30,7 @@ public class NotInterested extends MessageWithLengthAndIdField {
     }
 
     @Override
-    protected void writePayloadToBuffer(ByteBuffer dst) { } // no payload
+    public void writePayloadToBuffer(ByteBuffer dst) { } // no payload
 
     @Override
     int getRawPayloadLength() {

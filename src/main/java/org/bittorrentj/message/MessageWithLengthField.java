@@ -139,12 +139,12 @@ public abstract class MessageWithLengthField extends Message {
     */
 
     @Override
-    public int getRawMessageLength() {
+    final public int getRawMessageLength() {
         return LENGTH_FIELD_SIZE + getRawIdAndPayloadLength();
     }
 
     @Override
-    public void writeMessageToBuffer(ByteBuffer dst) {
+    final public void writeMessageToBuffer(ByteBuffer dst) {
 
         // Write four byte big endian length field
         dst.putInt(getRawMessageLength());

@@ -13,14 +13,14 @@ import java.nio.ByteBuffer;
 public class BitField extends MessageWithLengthAndIdField {
 
     /**
-     * Binary representation of bit field
+     * Binary representation of bit field.
      */
     private byte[] bitField;
 
     /**
      * Constructor based on boolean array representation of the
      * bit field, the length of which matches exactly the
-     * number of pieces in the torrent which the field represents. I.e,
+     * number of pieces in the torrent which the field represents.
      * Notice: trailing overflow bits should not represented
      * @param bitField bit field
      */
@@ -58,7 +58,7 @@ public class BitField extends MessageWithLengthAndIdField {
 
     /**
      * Converts a boolean array representation of a bit field
-     * to the a binary representation the bit field.
+     * to a binary representation.
      * @param b boolean array representation
      * @return byte representation
      */

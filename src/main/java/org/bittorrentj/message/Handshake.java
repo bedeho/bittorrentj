@@ -4,6 +4,8 @@ import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.message.field.PeerId;
 import org.bittorrentj.message.field.Reserved;
 
+import java.nio.ByteBuffer;
+
 /**
  * Created by bedeho on 01.09.2014.
  */
@@ -63,52 +65,46 @@ public class Handshake extends Message {
      * @return byte array of message
      * @throws IllegalStateException when all fields are not set, or pstrlen and pstr are not compatible
      */
-    public byte [] getRawMessage() throws IllegalStateException {
+    public void writeMessageToBuffer(ByteBuffer dst) {
 
-
-
-        // Size of new package
-        int total_size = 1 + pstrlen + Reserved.getLength() + Hash.getLength() + PeerId.getLength();
-
-        // Allocate space
-        byte [] raw = new byte[total_size];
-
-        // Fill
-        raw[0] = (byte)pstrlen;
+        // Make sure message fields are set
+        checkStateOrThrowException();
 
         // pstrlen
-        int to = 1;
-        System.arraycopy(pstr.getBytes(), 0, raw, to, pstr.length());
+        dst.put(pstr.getBytes());
 
         // reserved
-        to += pstr.length();
-        System.arraycopy(reserved.getRaw(), 0, raw, to, Reserved.getLength());
+        dst.put(reserved.getRaw());
 
         // info_hash
-        to += Reserved.getLength();
-        System.arraycopy(info_hash.getRaw(), 0, raw, to, Hash.getLength());
+        dst.put(info_hash.getRaw());
 
         // peer_id
-        to += Hash.getLength();
-        System.arraycopy(peer_id.getRaw(), 0, raw, to, PeerId.getLength());
-
-        // Return
-        return raw;
+        dst.put(peer_id.getRaw());
     }
 
+    @Override
     public int getRawMessageLength() {
 
+        // Make sure message fields are set
+        checkStateOrThrowException();
+
+        return 1 + pstrlen + Reserved.getLength() + Hash.getLength() + PeerId.getLength();
     }
 
-    private () {
+    /**
+     * Checks that all fields required for computing
+     * raw message and length.
+     * @throws IllegalStateException
+     */
+    private void checkStateOrThrowException() throws IllegalStateException {
+
         // If all fields are not set, which can be the case due to how handshake has a pause step,
         // then buffer form is not available
         if(pstrlen == 0 || pstr == null || reserved == null || info_hash == null || peer_id == null)
             throw new IllegalStateException("All fields are not set");
         else if(this.pstr.length() != this.pstrlen)
             throw new IllegalStateException("pstrlen and pstr are not compatible");
-
-
     }
 
     public int getPstrlen() {
