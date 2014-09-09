@@ -75,7 +75,7 @@ public class BitField extends MessageWithLengthAndIdField {
 
             // If given bit is set, then set it in binary field as well
             if(b[i])
-                setPieceAvailability(b, i, true);
+                setPieceAvailability(binaryBitfield, i, true);
         }
 
         return binaryBitfield;
@@ -98,11 +98,19 @@ public class BitField extends MessageWithLengthAndIdField {
      * @return true iff it is available
      */
     public boolean getPieceAvailability(int pieceIndex) {
-        return getPieceAvailability(pieceIndex, this.bitField);
+        return getPieceAvailability(this.bitField, pieceIndex);
     }
 
-    public static boolean getPieceAvailability(int pieceIndex, byte[] b) {
-        
+    public static boolean getPieceAvailability(byte[] b, int index) {
+
+        // To which byte in the binary bitField does this (i\th) bit correspond
+        int byteLocation = (int) Math.floor((index + 1) / 8);
+
+        // To which bit location within the given byteLocation does this (i\th) bit correspond
+        int bitLocationWithinByte = index % 8;
+
+        // Check if bit is set
+        return (b[byteLocation] & (bitLocationWithinByte >> (byte)(0b10000000))) != 0;
     }
 
     /**
@@ -112,20 +120,28 @@ public class BitField extends MessageWithLengthAndIdField {
      * @param availability new availability status of piece
      */
     public void setPieceAvailability(int pieceIndex, boolean availability) {
-        setPieceAvailability(pieceIndex, availability, this.bitField);
+        setPieceAvailability(this.bitField, pieceIndex, availability);
     }
 
-    public static void setPieceAvailability(int pieceIndex, boolean availability, byte[] b) {
+    /**
+     * Worker routine for manipulating bit field
+     * @param b bit field
+     * @param index bit index
+     * @param availability new truth value of bit
+     */
+    public static void setPieceAvailability(byte[] b, int index, boolean availability) {
 
-        // To which byte in the binary bitField does this (i'th) bit correspond
-        int byteLocation = (int) Math.floor((i + 1) / 8);
+        // To which byte in the binary bitField does this (i\th) bit correspond
+        int byteLocation = (int) Math.floor((index + 1) / 8);
 
-        // To which bit location within the given byteLocation does this (i'th) bit correspond
-        int bitLocationWithinByte = i % 8;
+        // To which bit location within the given byteLocation does this (i\th) bit correspond
+        int bitLocationWithinByte = index % 8;
 
-        // Set bit
-        b[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));// <---- CHECK LATER
-
+        // Alter bit based on availability
+        if(availability)
+            b[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));
+        else
+            b[byteLocation] &= (bitLocationWithinByte >> (byte)(0b01111111));
     }
 
     /**
@@ -134,7 +150,7 @@ public class BitField extends MessageWithLengthAndIdField {
      * corresponds to. It first checks that the bit field
      * is of the correct size, then it checks
      * that the trailing bits in the last byte are all zero.
-     * The last check is required by the bittorrent spesification.
+     * The last check is required by the bittorrent specification.
      * @param numberOfPiecesInTorrent number of pieces in the torrent
      * @return true if bit field passes both checks
      */
@@ -146,9 +162,10 @@ public class BitField extends MessageWithLengthAndIdField {
             return false;
 
         // If a trailing bit is set to true, then this bit field is invalid
-        for(int i = numberOfPiecesInTorrent;i < 8*bitField.length;i++)
-            if(getPieceAvailability(i))
+        for(int i = numberOfPiecesInTorrent;i < 8*bitField.length;i++) {
+            if (getPieceAvailability(i))
                 return false;
+        }
 
         // If not, then it is valid
         return true;
