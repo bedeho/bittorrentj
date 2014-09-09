@@ -65,12 +65,7 @@ public class Handshake extends Message {
      */
     public byte [] getRawMessage() throws IllegalStateException {
 
-        // If all fields are not set, which can be the case due to how handshake has a pause step,
-        // then buffer form is not available
-        if(pstrlen == 0 || pstr == null || reserved == null || info_hash == null || peer_id == null)
-            throw new IllegalStateException("All fields are not set");
-        else if(this.pstr.length() != this.pstrlen)
-            throw new IllegalStateException("pstrlen and pstr are not compatible");
+
 
         // Size of new package
         int total_size = 1 + pstrlen + Reserved.getLength() + Hash.getLength() + PeerId.getLength();
@@ -102,6 +97,17 @@ public class Handshake extends Message {
     }
 
     public int getRawMessageLength() {
+
+    }
+
+    private () {
+        // If all fields are not set, which can be the case due to how handshake has a pause step,
+        // then buffer form is not available
+        if(pstrlen == 0 || pstr == null || reserved == null || info_hash == null || peer_id == null)
+            throw new IllegalStateException("All fields are not set");
+        else if(this.pstr.length() != this.pstrlen)
+            throw new IllegalStateException("pstrlen and pstr are not compatible");
+
 
     }
 

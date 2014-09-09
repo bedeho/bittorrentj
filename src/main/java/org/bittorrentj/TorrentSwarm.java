@@ -194,6 +194,22 @@ public class TorrentSwarm extends Thread {
     }
 
     /**
+     * after creating a message:
+     * ------------------------
+     * if its a bitfield, check that it matches the number of pieces,if we know that number
+     * throw new InvalidBitFieldLengthInBitFieldMessageException(bitfield.length, numberOfPiecesInTorrent);
+     *
+     * if its a piece, check that: Check that it is non-negative and also not to large
+     if throw new InvalidPieceIndexInHaveMessage(this.pieceIndex, numberOfPiecesInTorrent);
+     *
+     *
+     *
+     *
+     * if its and extended message, then call upon the correct handler, and it needs to check
+     * that the length field was correct.
+     */
+
+    /**
      * Number of connections in swarm at present
      * @return
      */

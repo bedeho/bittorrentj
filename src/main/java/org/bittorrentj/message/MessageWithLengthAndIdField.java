@@ -4,12 +4,11 @@ package org.bittorrentj.message;
  * Created by bedeho on 05.09.2014.
  */
 
-import org.bittorrentj.message.exceptions.BufferToSmallForMessageException;
-import org.bittorrentj.message.exceptions.IncorrectIdFieldInMessageException;
-import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
+import org.bittorrentj.message.exceptions.ExtendedMessageFoundException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
 import org.bittorrentj.message.exceptions.MessageCreationException;
 import org.bittorrentj.message.field.MessageId;
-import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
+import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -29,19 +28,18 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
     protected MessageId id;
 
     /**
-     * Constructor based on binary buffer, position
+     * Constructor based on raw wire representation of message in a buffer, position
      * is left at the end of the message just read.
      * Since this class is abstract, it is only invoked
      * by subclass constructors.
      * @param id message id
-     * @param src source buffer containing raw wire form of message
-     * @throws IncorrectLengthFieldInMessageException
-     * @throws InvalidMessageIdException
-     * @throws IncorrectIdFieldInMessageException
+     * @param src buffer
+     * @throws UnrecognizedMessageIdException when id field in buffer is not recognized
+     * @throws NonMatchingIdFieldInMessageException when id parameter does not match message id field in buffer
      */
-    protected MessageWithLengthAndIdField(MessageId id, ByteBuffer src) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException {
+    protected MessageWithLengthAndIdField(MessageId id, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
 
-        // Read and process length field
+        // Read length field
         super(src);
 
         // Save id field
@@ -53,7 +51,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
         // Throw exception if it does not match id provided to constructor
         if(!id.equals(readId))
-            throw new IncorrectIdFieldInMessageException(readId, id);
+            throw new NonMatchingIdFieldInMessageException(readId, id);
     }
 
     /**
@@ -74,25 +72,15 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
     /**
      * Factory method for producing a MessageWithLengthField
-     * object based of the supplied byte buffer, whose
-     * position is advanced to end of message read.
-     * @param src buffer read from
-     * @return message created
-     * @throws BufferToSmallForMessageException if buffer has no space to read length field
+     * object based of the supplied buffer. The buffer position
+     * is left at the end of message.
+     * @param src buffer
+     * @return message
+     * @throws MessageCreationException when message was malformed in buffer
+     * @throws UnrecognizedMessageIdException when message id field in buffer was not recognized
+     * @throws ExtendedMessageFoundException when message id field in buffer indicated a BEP20 extension message which is not handshake message
      */
-    public static MessageWithLengthAndIdField create(ByteBuffer src) throws MessageCreationException, InvalidMessageIdException {
-
-        // Minimum size of messages of this class
-        int minSize = LENGTH_FIELD_SIZE + ID_FIELD_SIZE;
-
-        /**
-         * Confirm that message has space for smallest possible message of this class.
-         * When invoked by MessageWithLengthField.create(), this is guaranteed to be the case,
-         * but we have to check in general.
-         */
-
-        if(src.remaining() < minSize)
-            throw new BufferToSmallForMessageException(minSize, src);
+    public static MessageWithLengthAndIdField create(ByteBuffer src) throws MessageCreationException, UnrecognizedMessageIdException, ExtendedMessageFoundException {
 
         // Read raw id, without advancing position
         byte rawId = src.get(src.position() + LENGTH_FIELD_SIZE);
@@ -105,36 +93,40 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
         switch(id) {
             case CHOKE:
                 return new Choke(src);
-                break;
             case UNCHOKE:
                 return new UnChoke(src);
-                break;
             case INTERESTED:
                 return new Interested(src);
-                break;
             case NOT_INTERESTED:
                 return new NotInterested(src);
-                break;
             case HAVE:
                 return new Have(src);
-                break;
             case BITFIELD:
                 return new BitField(src);
-                break;
             case REQUEST:
                 return new Request(src);
-                break;
             case PIECE:
                 return new Piece(src);
-                break;
             case CANCEL:
                 return new Cancel(src);
-                break;
             case PORT:
-                break;
                 return new Port(src);
-            case EXTENDED: // what to do here
-                break;
+            case EXTENDED:
+
+                // Read raw id of extended message, without advancing position
+                byte eRawId = src.get(src.position() + LENGTH_FIELD_SIZE + Extended.EXTENDED_ID_FIELD_SIZE);
+
+                // Process the extended handshake message directly,
+                // otherwise raise exception so caller can process message.
+                if(eRawId == 0)
+                    return new ExtendedHandshake(src);
+                else
+                    throw new ExtendedMessageFoundException();
+            default:
+                // We cannot come here so long as all enum cases are covered, since
+                // getMessageIdFromRaw() throws this exception if
+                // the id is not among the known cases.
+                throw new UnrecognizedMessageIdException(rawId);
         }
     }
 
@@ -144,7 +136,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
     @Override
     public int getRawIdAndPayloadLength() {
-        return ID_FIELD_SIZE +  ();
+        return ID_FIELD_SIZE + getRawPayloadLength();
     }
 
     @Override

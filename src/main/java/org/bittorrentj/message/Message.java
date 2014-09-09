@@ -1,7 +1,5 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.BufferToSmallForMessageException;
-
 import java.nio.ByteBuffer;
 
 /**
@@ -42,30 +40,12 @@ public abstract class Message {
     }
 
     /**
-     * Writes raw wire representation of message
-     * into provided buffer at given position.
-     * A buffer in big endian mode is expected, and position
-     * of buffer is advanced to end of message written.
-     * @param dst
-     * @throws BufferToSmallForMessageException buffer does not have sufficient space for message
-     */
-    public void writeRawMessage(ByteBuffer dst) throws BufferToSmallForMessageException {
-
-        // Check that there is enough space
-        if(dst.remaining() < getRawMessageLength())
-            throw new BufferToSmallForMessageException(getRawMessageLength(), dst);
-
-        // Fill buffer
-        writeMessageToBuffer(dst);
-    }
-
-    /**
      * Write wire representation of full message (<length><id><payload>) into buffer, while
      * trusting it has sufficient space. Position
      * of buffer is advanced to end of message written.
-     * This is a helper routine, protected and thus not callable
-     * outside class, which is used by the public writeRawMessage().
-     * @param dst
+     * A buffer in big endian mode is expected, and position
+     * of buffer is advanced to end of message written.
+     * @param dst buffer written to
      */
-    abstract protected void writeMessageToBuffer(ByteBuffer dst);
+    abstract public void writeMessageToBuffer(ByteBuffer dst);
 }

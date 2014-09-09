@@ -1,7 +1,7 @@
 package org.bittorrentj.message;
 
 import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
-import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
+import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -19,7 +19,7 @@ public class KeepAlive extends MessageWithLengthField {
      * @param src buffer containing raw wire form of message
      * @throws IncorrectLengthFieldInMessageException
      */
-    public KeepAlive(ByteBuffer src) throws InvalidMessageIdException,IncorrectLengthFieldInMessageException {
+    public KeepAlive(ByteBuffer src) throws UnrecognizedMessageIdException,IncorrectLengthFieldInMessageException {
         super(src);
     }
 

@@ -1,9 +1,9 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.BufferToSmallForMessageException;
+import org.bittorrentj.message.exceptions.ExtendedMessageFoundException;
 import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.exceptions.MessageCreationException;
-import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
+import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -23,53 +23,60 @@ public abstract class MessageWithLengthField extends Message {
     public final static int LENGTH_FIELD_SIZE = 4;
 
     /**
+     * The value of the length field in the message header.
+     * This variable is only set in the buffer based constructor in this
+     * class, based on the length field, so that corresponding
+     * constructors in extending classes can verify it against the
+     * full message length read from buffer.
+     */
+    private int messageLengthField;
+
+    /**
+     * Indicates whether the buffer constructors was used
+     */
+    private boolean bufferConstructorUsed;
+
+    /**
      * Constructor based on binary buffer, position
      * is left at the end of the message just read.
      * Since this class is abstract, it is only invoked
      * by subclass constructors.
      * @param src buffer containing raw wire form of message
-     * @throws IncorrectLengthFieldInMessageException when length field of buffer does not match length computed by getRawMessageLength()
      */
-    protected MessageWithLengthField(ByteBuffer src) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException {
+    protected MessageWithLengthField(ByteBuffer src) {
 
         // Recover length field in buffer
-        int messageLength = src.getInt();
+        this.messageLengthField = src.getInt();
 
-        // Check that message actually has the claimed length
-        int computedLength = getRawMessageLength();
-        if(messageLength != computedLength)
-            throw new IncorrectLengthFieldInMessageException(messageLength, computedLength);
+        // Save that buffer constructor was used,
+        // this allows getMessageLengthField() to be called without the
+        // IllegalStateException exception
+        this.bufferConstructorUsed = true;
     }
 
     /**
      * Default constructor, is needed by constructor of keep alive
      * (direct subclass) since it requires no arguments.
      */
-    protected MessageWithLengthField() {}
+    protected MessageWithLengthField() {
+
+        // Save that buffer constructor was not used,
+        // this causes getMessageLengthField() to throw the IllegalStateException exception
+        this.bufferConstructorUsed = false;
+    }
 
     /**
      * Factory method for producing a MessageWithLengthField
      * message based of the supplied byte buffer, whose
      * position is advanced to end of message read.
      * @param src buffer read from
-     * @return message created
+     * @return created message
      * @throws MessageCreationException
-     * @throws InvalidMessageIdException
+     * @throws org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException
      */
-    public static MessageWithLengthField create(ByteBuffer src) throws MessageCreationException, InvalidMessageIdException {
+    public static MessageWithLengthField create(ByteBuffer src) throws MessageCreationException, UnrecognizedMessageIdException, ExtendedMessageFoundException {
 
-        // Minimum size of messages of this class
-        int minSize = LENGTH_FIELD_SIZE;
-
-        /**
-        * Confirm that message has space for smallest possible message of this class.
-        * When invoked by network read buffer, this is guaranteed to be the case,
-        * but we have to check in general.
-        */
-        if(src.remaining() < minSize)
-            throw new BufferToSmallForMessageException(minSize, src);
-
-        // Otherwise read length field
+        // Read length field
         int messageIdAndPayloadSize = src.getInt();
 
         /**
@@ -90,13 +97,54 @@ public abstract class MessageWithLengthField extends Message {
         }
     }
 
+    /**
+     * The length field of the byte buffer
+     * parsed if the buffer constructor is used.
+     * <b>If that constructor was not used, then this
+     * value will be zero, hence it does not represent the
+     * length of the raw message under all circumstances.
+     * Use getRawMessageLength() for that purpose.</b>
+     * The purpose of this message is to expose the
+     * parsed length field value for constructors of extending messages.
+     * @return byte length
+     */
+    public int getMessageLengthField() {
+
+        if(!bufferConstructorUsed)
+            throw new IllegalStateException();
+        else
+            return messageLengthField;
+    }
+
+    /**
+     * REMOVE`?:
+     * Compares the message length field with the computed
+     * message length, as computed by getRawMessageLength().
+     * Is used by by buffer constructors of extending
+     * classes to check that header message field is
+     * in agreement with m
+     * @return true iff the fields match
+     * @throws IncorrectLengthFieldInMessageException when they don't match
+
+    protected boolean validateMessageLengthFieldOrThrowException() throws IncorrectLengthFieldInMessageException {
+
+        int parseMessageLength = getRawMessageLength();
+        int lengthField = getMessageLengthField();
+
+        if(lengthField != parseMessageLength)
+            throw new IncorrectLengthFieldInMessageException(lengthField, parseMessageLength);
+        else
+            return true;
+    }
+    */
+
     @Override
     public int getRawMessageLength() {
         return LENGTH_FIELD_SIZE + getRawIdAndPayloadLength();
     }
 
     @Override
-    protected void writeMessageToBuffer(ByteBuffer dst) {
+    public void writeMessageToBuffer(ByteBuffer dst) {
 
         // Write four byte big endian length field
         dst.putInt(getRawMessageLength());

@@ -175,7 +175,7 @@ public class Connection {
                 ByteBuffer temporaryBuffer = networkReadBuffer.wrap....asReadOnlyBuffer();
 
                 // Generate a new message
-                MessageWithLengthField m = MessageWithLengthField.create(temporaryBuffer);
+                MessageWithLengthField m = MessageWithLengthField.create(temporaryBuffer, );
 
                 // Save message in read queue
                 readMessagesQueue.add(m);

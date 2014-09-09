@@ -1,10 +1,9 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.IncorrectIdFieldInMessageException;
-import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
 import org.bittorrentj.message.exceptions.InvalidBitFieldLengthInBitFieldMessageException;
 import org.bittorrentj.message.field.MessageId;
-import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
+import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
 
@@ -14,86 +13,150 @@ import java.nio.ByteBuffer;
 public class BitField extends MessageWithLengthAndIdField {
 
     /**
-     * The payload is the zero-based index of the piece
+     * Binary representation of bit field
      */
-    private boolean[] bitfield;
+    private byte[] bitField;
 
     /**
-     * Constructor based on boolean array representation of
-     * bitfield, the length of which matches exactly the
-     * number of pieces the bitfield represents. I.e,
-     * trailing overflow bits are not represented
-     * @param bitfield bitfield for this message
+     * Constructor based on boolean array representation of the
+     * bit field, the length of which matches exactly the
+     * number of pieces in the torrent which the field represents. I.e,
+     * Notice: trailing overflow bits should not represented
+     * @param bitField bit field
      */
-    public BitField(boolean[] bitfield) {
+    public BitField(boolean[] bitField) {
         super(MessageId.BITFIELD);
 
-        this.bitfield = bitfield;
-    }
-
-    public BitField(ByteBuffer src, int numberOfPiecesInTorrent) throws IncorrectLengthFieldInMessageException, InvalidMessageIdException, IncorrectIdFieldInMessageException, InvalidBitFieldLengthInBitFieldMessageException {
-
-        // Read and process length and id fields
-        super(MessageId.BITFIELD, src);
-
-        // Read piece index
-        this.bitfield = ...zzzz(src.getInt());
-
-        // Check that bitfield
-        if(bitfield.length != numberOfPiecesInTorrent)
-            throw new InvalidBitFieldLengthInBitFieldMessageException(bitfield.length, numberOfPiecesInTorrent);
-    }
-
-    public boolean getPieceAvailability(int pieceIndex) {
-        return bitfield[pieceIndex];
-    }
-
-    public int getNumberOfPieces() {
-        return bitfield.length;
+        // Save as binary bitField
+        this.bitField = booleanToByteBitField(bitField);
     }
 
     /**
-     * Computes number of bytes requried in raw
-     * wire representation of bitfield property.
-     * Notice: Does not give size of BitField message itself,
-     * use getRawMessageLength() for this.
-     * @return
+     * Constructor based on wire representation.
+     * @param src buffer
+     * @throws UnrecognizedMessageIdException when message id field in buffer is not recognized
+     * @throws NonMatchingIdFieldInMessageException when message id field in buffer does not match BITFIELD message id
+     * @throws InvalidBitFieldLengthInBitFieldMessageException when header length field implies non-positive byte length bitField
      */
-    public int getLengthOfOnlyBitField() {
-        return (int)Math.ceil(bitfield.length/8);
+    public BitField(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException, InvalidBitFieldLengthInBitFieldMessageException {
+
+        // Read length and id fields
+        super(MessageId.BITFIELD, src);
+
+        // Get length field
+        int byteLengthOfBitfield = getMessageLengthField() - 1;
+
+        // Verify that length field is not malicious
+        if(byteLengthOfBitfield <= 0)
+            throw new InvalidBitFieldLengthInBitFieldMessageException(byteLengthOfBitfield);
+
+        // Copy from byte buffer into a byte array,
+        // and then convert to boolean bitField
+        byte[] b = new byte[byteLengthOfBitfield];
+        src.get(b);
     }
 
-    @Override
-    public int getRawMessageLength() {
-        return LENGTH_FIELD_SIZE + ID_FIELD_SIZE + getLengthOfOnlyBitField(); // round up to nearest byte
-    }
+    /**
+     * Converts a boolean array representation of a bit field
+     * to the a binary representation the bit field.
+     * @param b boolean array representation
+     * @return byte representation
+     */
+    public static byte[] booleanToByteBitField(boolean[] b) {
 
-    @Override
-    protected void writeMessageToBuffer(ByteBuffer dst) {
+        // Size of new byte representation
+        int size = binaryBitFieldLength(b.length);
 
-        // Write to buffer, and advance position
-        dst.putInt(getRawMessageLength()).put(id.getRaw());
+        // Allocate space for byte representation
+        byte [] binaryBitfield = new byte[size];
 
-        // Convert to byte bitfield, first allocate space with all zeros
-        byte [] binaryBitfield = new byte[getLengthOfOnlyBitField()];
-
-        for(int i = 0;i < bitfield.length;i++) {
+        // Iterate boolean bit field and set corresponding bit in byte bit field
+        for(int i = 0;i < b.length;i++) {
 
             // If given bit is set, then set it in binary field as well
-            if(bitfield[i]) {
-
-                // To which byte in the binary bitfield does this (i'th) bit correspond
-                int byteLocation = (int) Math.floor((i + 1) / 8);
-
-                // To which bit location within the given byteLocation does this (i'th) bit correspond
-                int bitLocationWithinByte = i % 8;
-
-                // Set bit
-                binaryBitfield[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));
-            }
+            if(b[i])
+                setPieceAvailability(i, true);
         }
 
-        // Write byte representation of bitfield
-        dst.put(binaryBitfield);
+        return binaryBitfield;
+    }
+
+    /**
+     * Computes the byte length of the binary representation of a bit field
+     * based on the number of bits that must be represented
+     * @param numberOfBits number of bits that must be represented
+     * @return byte length of bit field
+     */
+    public static int binaryBitFieldLength(int numberOfBits) {
+        return (int)Math.ceil(numberOfBits/8);
+    }
+
+
+    /**
+     * Returns the availability status of the given piece,
+     * as specified by a zero-based index, based on this
+     * bit field.
+     * @param pieceIndex zero-based piece index
+     * @return true iff it is available
+     */
+    public boolean getPieceAvailability(int pieceIndex) {
+
+    }
+
+    /**
+     * Alters the availability status of the given piece,
+     * as specified by a zero-based index, based on this
+     * bit field.
+     *
+     * @param pieceIndex zero-based piece index
+     * @param availability new availability status of piece
+     */
+    public void setPieceAvailability(int pieceIndex, boolean availability) {
+
+        // To which byte in the binary bitField does this (i'th) bit correspond
+        int byteLocation = (int) Math.floor((i + 1) / 8);
+
+        // To which bit location within the given byteLocation does this (i'th) bit correspond
+        int bitLocationWithinByte = i % 8;
+
+        // Set bit
+        binaryBitfield[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));// <---- CHECK LATER
+
+    }
+
+    /**
+     * Check tha validity of the bit field message, given
+     * the number of pieces in the torrent which the message
+     * corresponds to. It first checks that the bit field
+     * is of the correct size, then it checks
+     * that the trailing bits in the last byte are all zero.
+     * The last check is required by the bittorrent spesification.
+     * @param numberOfPiecesInTorrent number of pieces in the torrent
+     * @return true if bit field passes both checks
+     */
+    public boolean validateBitField(int numberOfPiecesInTorrent) {
+
+        // Does the bitfield have the number of bytes corresponding
+        // to this number of pieces in the torrent? (not equal, but corresponding)
+        if(bitField.length != binaryBitFieldLength(numberOfPiecesInTorrent))
+            return false;
+
+        // If a trailing bit is set to true, then this bit field is invalid
+        for(int i = numberOfPiecesInTorrent;i < 8*bitField.length;i++)
+            if(getPieceAvailability(i))
+                return false;
+
+        // If not, then it is valid
+        return true;
+    }
+
+    @Override
+    public int getRawPayloadLength() {
+        return bitField.length;
+    }
+
+    @Override
+    protected void writePayloadToBuffer(ByteBuffer dst) {
+        dst.put(this.bitField);
     }
 }

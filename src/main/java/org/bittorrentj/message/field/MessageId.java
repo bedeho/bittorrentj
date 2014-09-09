@@ -1,6 +1,6 @@
 package org.bittorrentj.message.field;
 
-import org.bittorrentj.message.field.exceptions.InvalidMessageIdException;
+import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 /**
  * Created by bedeho on 05.09.2014.
@@ -41,9 +41,9 @@ public enum MessageId {
      * corresponding MessageId object.
      * @param rawId raw wire representation of rawId
      * @return the MessageId
-     * @throws InvalidMessageIdException if rawId is not recognized
+     * @throws org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException if rawId is not recognized
      */
-    public static MessageId getMessageIdFromRaw(byte rawId) throws InvalidMessageIdException {
+    public static MessageId getMessageIdFromRaw(byte rawId) throws UnrecognizedMessageIdException {
 
         // Look for match among values
         for(MessageId i : MessageId.values()) {
@@ -52,6 +52,6 @@ public enum MessageId {
                 return i;
         }
 
-        throw new InvalidMessageIdException(rawId);
+        throw new UnrecognizedMessageIdException(rawId);
     }
 }

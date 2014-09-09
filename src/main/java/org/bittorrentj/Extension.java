@@ -1,9 +1,30 @@
 package org.bittorrentj;
 
+import org.bittorrentj.message.Extended;
+
 /**
  * Created by bedeho on 30.08.2014.
  */
-public class Extension {
+public interface Extension {
+
+    /**
+     * Name of extension, as used in BEP20 handshake m dictionary
+     * @return name
+     */
+    public String getName();
+
+    /**
+     * Literal description of extension.
+     * @return description
+     */
+    public String getDescription();
+
+    /**
+     * Process new extended message arriving on given connection
+     * @param c Connection where message arrived
+     * @param m message
+     */
+    public void processMessage(Connection c, Extended m);
 }
 
 /*
