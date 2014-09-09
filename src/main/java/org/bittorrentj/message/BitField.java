@@ -65,7 +65,7 @@ public class BitField extends MessageWithLengthAndIdField {
     public static byte[] booleanToByteBitField(boolean[] b) {
 
         // Size of new byte representation
-        int size = binaryBitFieldLength(b.length);
+        int size = bitFieldByteLength(b.length);
 
         // Allocate space for byte representation
         byte [] binaryBitfield = new byte[size];
@@ -75,7 +75,7 @@ public class BitField extends MessageWithLengthAndIdField {
 
             // If given bit is set, then set it in binary field as well
             if(b[i])
-                setPieceAvailability(i, true);
+                setPieceAvailability(b, i, true);
         }
 
         return binaryBitfield;
@@ -83,35 +83,39 @@ public class BitField extends MessageWithLengthAndIdField {
 
     /**
      * Computes the byte length of the binary representation of a bit field
-     * based on the number of bits that must be represented
+     * based on the number of bits that must be represented.
      * @param numberOfBits number of bits that must be represented
      * @return byte length of bit field
      */
-    public static int binaryBitFieldLength(int numberOfBits) {
+    public static int bitFieldByteLength(int numberOfBits) {
         return (int)Math.ceil(numberOfBits/8);
     }
 
-
     /**
      * Returns the availability status of the given piece,
-     * as specified by a zero-based index, based on this
-     * bit field.
+     * as specified by a zero-based index, based on this bit field.
      * @param pieceIndex zero-based piece index
      * @return true iff it is available
      */
     public boolean getPieceAvailability(int pieceIndex) {
+        return getPieceAvailability(pieceIndex, this.bitField);
+    }
 
+    public static boolean getPieceAvailability(int pieceIndex, byte[] b) {
+        
     }
 
     /**
      * Alters the availability status of the given piece,
-     * as specified by a zero-based index, based on this
-     * bit field.
-     *
+     * as specified by a zero-based index, based on this bit field.
      * @param pieceIndex zero-based piece index
      * @param availability new availability status of piece
      */
     public void setPieceAvailability(int pieceIndex, boolean availability) {
+        setPieceAvailability(pieceIndex, availability, this.bitField);
+    }
+
+    public static void setPieceAvailability(int pieceIndex, boolean availability, byte[] b) {
 
         // To which byte in the binary bitField does this (i'th) bit correspond
         int byteLocation = (int) Math.floor((i + 1) / 8);
@@ -120,7 +124,7 @@ public class BitField extends MessageWithLengthAndIdField {
         int bitLocationWithinByte = i % 8;
 
         // Set bit
-        binaryBitfield[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));// <---- CHECK LATER
+        b[byteLocation] |= (bitLocationWithinByte >> (byte)(0b10000000));// <---- CHECK LATER
 
     }
 
@@ -138,7 +142,7 @@ public class BitField extends MessageWithLengthAndIdField {
 
         // Does the bitfield have the number of bytes corresponding
         // to this number of pieces in the torrent? (not equal, but corresponding)
-        if(bitField.length != binaryBitFieldLength(numberOfPiecesInTorrent))
+        if(bitField.length != bitFieldByteLength(numberOfPiecesInTorrent))
             return false;
 
         // If a trailing bit is set to true, then this bit field is invalid

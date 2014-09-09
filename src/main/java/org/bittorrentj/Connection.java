@@ -195,7 +195,7 @@ public class Connection {
             // If unconsumed data touches buffer limit,
             // then copy to the front of the buffer
 
-            do_copying_here
+            do_copying_to_front_here
 
             copyAtEdgeEvent++;
         }
