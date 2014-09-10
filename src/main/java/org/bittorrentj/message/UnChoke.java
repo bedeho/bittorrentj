@@ -1,6 +1,6 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
@@ -17,9 +17,9 @@ public class UnChoke extends MessageWithLengthAndIdField {
      * @param src buffer
      * @throws IncorrectLengthFieldInMessageException when length field does not match computed message length
      * @throws org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException when id does not match UNCHOKE message id
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException when id field is invalid
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id field is invalid
      */
-    public UnChoke(ByteBuffer src) throws IncorrectLengthFieldInMessageException, UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+    public UnChoke(ByteBuffer src) throws IncorrectLengthFieldInMessageException, UnrecognizedMessageIdException, NonMatchingIdFieldException {
         super(MessageId.UNCHOKE, src); // Read and process length and id fields
     }
 

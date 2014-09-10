@@ -1,7 +1,7 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.NonMatchingExtendedIdFieldInMessageException;
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingExtendedIdFieldException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -28,10 +28,10 @@ public abstract class Extended extends MessageWithLengthAndIdField {
      * @param extendedMessageId id of extended message
      * @param src buffer
      * @throws UnrecognizedMessageIdException when id field is not recognized
-     * @throws NonMatchingIdFieldInMessageException when id does not match EXTENDED message id
-     * @throws NonMatchingExtendedIdFieldInMessageException when extended message id does not match the expected extended message id
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id does not match EXTENDED message id
+     * @throws org.bittorrentj.message.exceptions.NonMatchingExtendedIdFieldException when extended message id does not match the expected extended message id
      */
-    public Extended(int extendedMessageId, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException, NonMatchingExtendedIdFieldInMessageException {
+    public Extended(int extendedMessageId, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException, NonMatchingExtendedIdFieldException {
         super(MessageId.EXTENDED, src);
 
         // Save extended message id
@@ -42,13 +42,17 @@ public abstract class Extended extends MessageWithLengthAndIdField {
 
         // Confirm that they are identical
         if(this.extendedMessageId != readExtendedMessageId)
-            throw new NonMatchingExtendedIdFieldInMessageException(readExtendedMessageId, extendedMessageId);
+            throw new NonMatchingExtendedIdFieldException(readExtendedMessageId, extendedMessageId);
     }
 
     public Extended(int extendedMessageId) {
         super(MessageId.EXTENDED);
 
         this.extendedMessageId = extendedMessageId;
+    }
+
+    public int getExtendedMessageId() {
+        return extendedMessageId;
     }
 
     @Override

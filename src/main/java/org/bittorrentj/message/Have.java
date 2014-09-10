@@ -1,6 +1,6 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -30,9 +30,9 @@ public class Have extends MessageWithLengthAndIdField {
      * Constructor based of raw wire representation in buffer
      * @param src buffer
      * @throws UnrecognizedMessageIdException
-     * @throws NonMatchingIdFieldInMessageException when id in buffer does not match HAVE message id
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id in buffer does not match HAVE message id
      */
-    public Have(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+    public Have(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
 
         // Read and process length and id fields
         super(MessageId.HAVE, src);

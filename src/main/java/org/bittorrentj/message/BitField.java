@@ -1,6 +1,6 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.exceptions.InvalidBitFieldLengthInBitFieldMessageException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
@@ -35,10 +35,10 @@ public class BitField extends MessageWithLengthAndIdField {
      * Constructor based on wire representation.
      * @param src buffer
      * @throws UnrecognizedMessageIdException when message id field in buffer is not recognized
-     * @throws NonMatchingIdFieldInMessageException when message id field in buffer does not match BITFIELD message id
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when message id field in buffer does not match BITFIELD message id
      * @throws InvalidBitFieldLengthInBitFieldMessageException when header length field implies non-positive byte length bitField
      */
-    public BitField(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException, InvalidBitFieldLengthInBitFieldMessageException {
+    public BitField(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException, InvalidBitFieldLengthInBitFieldMessageException {
 
         // Read length and id fields
         super(MessageId.BITFIELD, src);

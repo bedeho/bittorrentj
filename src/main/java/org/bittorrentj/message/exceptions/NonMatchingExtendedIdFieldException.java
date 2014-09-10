@@ -8,7 +8,7 @@ import org.bittorrentj.message.field.MessageId;
  * Exception thrown when in Extended raw buffer constructor if extended id field of
  * provided in buffer is inconsistent with expected extended id which is separately passed to constructor.
  */
-public class NonMatchingExtendedIdFieldInMessageException extends MessageCreationException {
+public class NonMatchingExtendedIdFieldException extends MessageCreationException {
 
     /**
      * Id which was read from raw message
@@ -20,7 +20,7 @@ public class NonMatchingExtendedIdFieldInMessageException extends MessageCreatio
      */
     private int expectedId;
 
-    public NonMatchingExtendedIdFieldInMessageException(int readId, int expectedId) {
+    public NonMatchingExtendedIdFieldException(int readId, int expectedId) {
 
         this.readId = readId;
         this.expectedId = expectedId;

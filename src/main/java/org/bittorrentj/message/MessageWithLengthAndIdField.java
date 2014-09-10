@@ -5,7 +5,7 @@ package org.bittorrentj.message;
  */
 
 import org.bittorrentj.message.exceptions.ExtendedMessageFoundException;
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.exceptions.MessageCreationException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
@@ -35,9 +35,9 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
      * @param id message id
      * @param src buffer
      * @throws UnrecognizedMessageIdException when id field in buffer is not recognized
-     * @throws NonMatchingIdFieldInMessageException when id parameter does not match message id field in buffer
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id parameter does not match message id field in buffer
      */
-    protected MessageWithLengthAndIdField(MessageId id, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+    protected MessageWithLengthAndIdField(MessageId id, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
 
         // Read length field
         super(src);
@@ -51,7 +51,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
         // Throw exception if it does not match id provided to constructor
         if(!id.equals(readId))
-            throw new NonMatchingIdFieldInMessageException(readId, id);
+            throw new NonMatchingIdFieldException(readId, id);
     }
 
     /**

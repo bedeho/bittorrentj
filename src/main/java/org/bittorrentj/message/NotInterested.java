@@ -1,7 +1,6 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
-import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
+import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -16,9 +15,9 @@ public class NotInterested extends MessageWithLengthAndIdField {
      * Constructor based off raw wire representation in buffer
      * @param src
      * @throws UnrecognizedMessageIdException when id does not match NOT_INTERESTED message id
-     * @throws NonMatchingIdFieldInMessageException when id field is invalid
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id field is invalid
      */
-    public NotInterested(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+    public NotInterested(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
         super(MessageId.NOT_INTERESTED, src); // Read and process length and id fields
     }
 
