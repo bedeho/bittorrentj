@@ -1,5 +1,6 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.NonMatchingExtendedIdFieldInMessageException;
 import org.bittorrentj.message.exceptions.NonMatchingIdFieldInMessageException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
@@ -24,14 +25,24 @@ public abstract class Extended extends MessageWithLengthAndIdField {
 
     /**
      * Constructor based on raw wire representation.
+     * @param extendedMessageId id of extended message
      * @param src buffer
-     * @throws UnrecognizedMessageIdException when id does not match CHOKE message id
-     * @throws NonMatchingIdFieldInMessageException when id field is invalid
+     * @throws UnrecognizedMessageIdException when id field is not recognized
+     * @throws NonMatchingIdFieldInMessageException when id does not match EXTENDED message id
+     * @throws NonMatchingExtendedIdFieldInMessageException when extended message id does not match the expected extended message id
      */
-    public Extended(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException {
+    public Extended(int extendedMessageId, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldInMessageException, NonMatchingExtendedIdFieldInMessageException {
         super(MessageId.EXTENDED, src);
 
-        this.extendedMessageId = src.getInt();
+        // Save extended message id
+        this.extendedMessageId = extendedMessageId;
+
+        // Read extended message id from buffer
+        int readExtendedMessageId = src.getInt();
+
+        // Confirm that they are identical
+        if(this.extendedMessageId != readExtendedMessageId)
+            throw new NonMatchingExtendedIdFieldInMessageException(readExtendedMessageId, extendedMessageId);
     }
 
     public Extended(int extendedMessageId) {
