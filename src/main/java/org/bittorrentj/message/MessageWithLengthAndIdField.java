@@ -4,13 +4,15 @@ package org.bittorrentj.message;
  * Created by bedeho on 05.09.2014.
  */
 
-import org.bittorrentj.message.exceptions.ExtendedMessageFoundException;
+import org.bittorrentj.extension.Extension;
+import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
 import org.bittorrentj.message.exceptions.MessageCreationException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 
 /**
  * Messages of this type take following form on wire: <length prefix><message ID><payload>.
@@ -32,10 +34,10 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
      * is left at the end of the message just read.
      * Since this class is abstract, it is only invoked
      * by subclass constructors.
-     * @param id message id
-     * @param src buffer
-     * @throws UnrecognizedMessageIdException when id field in buffer is not recognized
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id parameter does not match message id field in buffer
+     * @param id message id.
+     * @param src buffer.
+     * @throws UnrecognizedMessageIdException if id field in buffer is not recognized.
+     * @throws NonMatchingIdFieldException if id parameter does not match message id field in buffer.
      */
     protected MessageWithLengthAndIdField(MessageId id, ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
 
@@ -76,11 +78,11 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
      * is left at the end of message.
      * @param src buffer
      * @return message
-     * @throws MessageCreationException when message was malformed in buffer
-     * @throws UnrecognizedMessageIdException when message id field in buffer was not recognized
-     * @throws ExtendedMessageFoundException when message id field in buffer indicated a BEP20 extension message which is not handshake message
+     * @throws MessageCreationException if message was malformed in buffer.
+     * @throws UnrecognizedMessageIdException if message id field in buffer was not recognized.
+     * @throws org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException if message id field in buffer indicated a BEP20 extension message which is not handshake message.
      */
-    public static MessageWithLengthAndIdField create(ByteBuffer src) throws MessageCreationException, UnrecognizedMessageIdException, ExtendedMessageFoundException {
+    public static MessageWithLengthAndIdField create(ByteBuffer src, HashMap<Integer, Extension> activeExtensions) throws MessageCreationException, UnrecognizedMessageIdException, UnsupportedExtendedMessageFoundException {
 
         // Read raw id, without advancing position
         byte rawId = src.get(src.position() + LENGTH_FIELD_SIZE);
@@ -120,8 +122,11 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
                 // otherwise raise exception so caller can process message.
                 if(eRawId == 0)
                     return new ExtendedHandshake(src);
-                else
-                    throw new ExtendedMessageFoundException();
+                else if(activeExtensions.containsKey((int)eRawId)) // we support this extension
+                    return activeExtensions.get((int)eRawId).parseMessage(src);
+                else // we dont support this
+                    throw new UnsupportedExtendedMessageFoundException(eRawId);
+
             default:
                 // We cannot come here so long as all enum cases are covered, since
                 // getMessageIdFromRaw() throws this exception if

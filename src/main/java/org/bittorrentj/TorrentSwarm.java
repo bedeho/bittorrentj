@@ -263,18 +263,16 @@ public class TorrentSwarm extends Thread {
     /**
      *
      * @return
-     */
     public ConnectionInformation getConnectionInformation() {
 
     }
+     */
 
     /**
      *
      */
     public void removeConnection(InetSocketAddress address) {
-
         // complicated
-
     }
 
     /**
@@ -286,15 +284,11 @@ public class TorrentSwarm extends Thread {
     }
 }
 /*
-
-
-
-
         do we have peers??? reconnect?
         findPeers()
         WHAT DOES THREAD DO, SLEEP ?
 synchronized halt()
-        chekc that we we are alredy running??
+        check that we we are alredy running??
         call on peers and extensions?
 private findPeers(): called either from begin() or from peerDisconnected(), perhaps this should be moved out
         What do we have available?

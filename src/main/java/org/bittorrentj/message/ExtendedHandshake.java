@@ -33,7 +33,7 @@ public class ExtendedHandshake extends Extended {
      * @throws DuplicateExtensionNameInMDictionaryException If an extension name was present more than once in the handshake m dictionary.
      * @throws PayloadDoesNotContainMDictionaryException If the m dictionary was not present in the handshake.
      * @throws MalformedMDictionaryException If the m dictionary did not have the expected structure.
-     * @throws DecodingBencodingException If the payload did not have a welformed bencoding.
+     * @throws DecodingBencodingException If the payload did not have a well-formed bencoding.
      * @throws ExtendedHandshakePayloadLengthToShortException If the length field was shorter than the minimum length of 6 = 4 + 1 + 1 = head length field (4b) + extension message id (1b) + handdshake id (1b).
      */
     public ExtendedHandshake(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException, NonMatchingExtendedIdFieldException, DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException, DecodingBencodingException, ExtendedHandshakePayloadLengthToShortException {
