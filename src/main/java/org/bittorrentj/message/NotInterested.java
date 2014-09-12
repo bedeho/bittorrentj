@@ -12,10 +12,10 @@ import java.nio.ByteBuffer;
 public class NotInterested extends MessageWithLengthAndIdField {
 
     /**
-     * Constructor based off raw wire representation in buffer
+     * Constructor based on wire representation of message.
      * @param src
-     * @throws UnrecognizedMessageIdException when id does not match NOT_INTERESTED message id
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id field is invalid
+     * @throws UnrecognizedMessageIdException when id does not match NOT_INTERESTED message id.
+     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id field is invalid.
      */
     public NotInterested(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
         super(MessageId.NOT_INTERESTED, src); // Read and process length and id fields
@@ -29,7 +29,7 @@ public class NotInterested extends MessageWithLengthAndIdField {
     }
 
     @Override
-    public void writePayloadToBuffer(ByteBuffer dst) { } // no payload
+    public void writePayloadToBuffer(ByteBuffer dst) { }
 
     @Override
     int getRawPayloadLength() {

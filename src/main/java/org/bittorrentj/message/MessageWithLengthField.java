@@ -1,7 +1,6 @@
 package org.bittorrentj.message;
 
 import org.bittorrentj.message.exceptions.ExtendedMessageFoundException;
-import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.exceptions.MessageCreationException;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -115,28 +114,6 @@ public abstract class MessageWithLengthField extends Message {
         else
             return messageLengthField;
     }
-
-    /**
-     * REMOVE`?:
-     * Compares the message length field with the computed
-     * message length, as computed by getRawMessageLength().
-     * Is used by by buffer constructors of extending
-     * classes to check that header message field is
-     * in agreement with m
-     * @return true iff the fields match
-     * @throws IncorrectLengthFieldInMessageException when they don't match
-
-    protected boolean validateMessageLengthFieldOrThrowException() throws IncorrectLengthFieldInMessageException {
-
-        int parseMessageLength = getRawMessageLength();
-        int lengthField = getMessageLengthField();
-
-        if(lengthField != parseMessageLength)
-            throw new IncorrectLengthFieldInMessageException(lengthField, parseMessageLength);
-        else
-            return true;
-    }
-    */
 
     @Override
     final public int getRawMessageLength() {

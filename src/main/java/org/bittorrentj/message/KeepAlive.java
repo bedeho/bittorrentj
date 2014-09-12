@@ -1,6 +1,5 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
@@ -11,15 +10,14 @@ import java.nio.ByteBuffer;
 public class KeepAlive extends MessageWithLengthField {
 
     /**
-     * Constructor based on binary buffer, position
-     * is left at the end of the message just read.
+     * Constructor based on wire representation of message. Position
+     * of buffer is left at the end of the message just read.
      * Not clear why anyone would ever use this constructor
      * directly, given that it requires peeking a head
      * in buffer, but we have it anyway.
      * @param src buffer containing raw wire form of message
-     * @throws IncorrectLengthFieldInMessageException
      */
-    public KeepAlive(ByteBuffer src) throws UnrecognizedMessageIdException,IncorrectLengthFieldInMessageException {
+    public KeepAlive(ByteBuffer src) throws UnrecognizedMessageIdException {
         super(src);
     }
 
@@ -35,5 +33,5 @@ public class KeepAlive extends MessageWithLengthField {
     }
 
     @Override
-    public void writeIdAndPayloadToBuffer(ByteBuffer dst) { } // no payload
+    public void writeIdAndPayloadToBuffer(ByteBuffer dst) { }
 }

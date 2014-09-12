@@ -22,7 +22,7 @@ public class BitField extends MessageWithLengthAndIdField {
      * bit field, the length of which matches exactly the
      * number of pieces in the torrent which the field represents.
      * Notice: trailing overflow bits should not represented
-     * @param bitField bit field
+     * @param bitField bit field.
      */
     public BitField(boolean[] bitField) {
         super(MessageId.BITFIELD);
@@ -32,11 +32,11 @@ public class BitField extends MessageWithLengthAndIdField {
     }
 
     /**
-     * Constructor based on wire representation.
+     * Constructor based on wire representation of message.
      * @param src buffer
-     * @throws UnrecognizedMessageIdException when message id field in buffer is not recognized
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when message id field in buffer does not match BITFIELD message id
-     * @throws InvalidBitFieldLengthInBitFieldMessageException when header length field implies non-positive byte length bitField
+     * @throws UnrecognizedMessageIdException if message id field is not recognized.
+     * @throws NonMatchingIdFieldException if message id field in buffer does not match BITFIELD message id.
+     * @throws InvalidBitFieldLengthInBitFieldMessageException if header length field implies non-positive byte length bitField.
      */
     public BitField(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException, InvalidBitFieldLengthInBitFieldMessageException {
 
@@ -59,8 +59,8 @@ public class BitField extends MessageWithLengthAndIdField {
     /**
      * Converts a boolean array representation of a bit field
      * to a binary representation.
-     * @param b boolean array representation
-     * @return byte representation
+     * @param b boolean array representation.
+     * @return byte representation.
      */
     public static byte[] booleanToByteBitField(boolean[] b) {
 
@@ -84,8 +84,8 @@ public class BitField extends MessageWithLengthAndIdField {
     /**
      * Computes the byte length of the binary representation of a bit field
      * based on the number of bits that must be represented.
-     * @param numberOfBits number of bits that must be represented
-     * @return byte length of bit field
+     * @param numberOfBits number of bits that must be represented.
+     * @return byte length of bit field.
      */
     public static int bitFieldByteLength(int numberOfBits) {
         return (int)Math.ceil(numberOfBits/8);
@@ -94,8 +94,8 @@ public class BitField extends MessageWithLengthAndIdField {
     /**
      * Returns the availability status of the given piece,
      * as specified by a zero-based index, based on this bit field.
-     * @param pieceIndex zero-based piece index
-     * @return true iff it is available
+     * @param pieceIndex zero-based piece index.
+     * @return true iff it is available.
      */
     public boolean getPieceAvailability(int pieceIndex) {
         return getPieceAvailability(this.bitField, pieceIndex);
@@ -116,8 +116,8 @@ public class BitField extends MessageWithLengthAndIdField {
     /**
      * Alters the availability status of the given piece,
      * as specified by a zero-based index, based on this bit field.
-     * @param pieceIndex zero-based piece index
-     * @param availability new availability status of piece
+     * @param pieceIndex zero-based piece index.
+     * @param availability new availability status of piece.
      */
     public void setPieceAvailability(int pieceIndex, boolean availability) {
         setPieceAvailability(this.bitField, pieceIndex, availability);

@@ -100,7 +100,7 @@ public class Connection {
     /**
      * Size (bytes) of networkReadBuffer
      */
-    private final static int NETWORK_READ_BUFFER_SIZE = 10 * 1024 * 1024;
+    public final static int NETWORK_READ_BUFFER_SIZE = 10 * 1024 * 1024;
 
     /**
      * Position in position in networkReadBuffer where data

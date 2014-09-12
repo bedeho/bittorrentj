@@ -12,10 +12,10 @@ import java.nio.ByteBuffer;
 public class Choke extends MessageWithLengthAndIdField  {
 
     /**
-     * Constructor based off raw wire representation
+     * Constructor based on wire representation of message.
      * @param src buffer
      * @throws UnrecognizedMessageIdException when id does not match CHOKE message id
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id field is invalid
+     * @throws NonMatchingIdFieldException when id field is invalid
      */
     public Choke(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
         super(MessageId.CHOKE, src);
@@ -26,7 +26,7 @@ public class Choke extends MessageWithLengthAndIdField  {
     }
 
     @Override
-    protected void writePayloadToBuffer(ByteBuffer dst) { } // no payload
+    protected void writePayloadToBuffer(ByteBuffer dst) { }
 
     @Override
     public int getRawPayloadLength() {

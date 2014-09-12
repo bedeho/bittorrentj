@@ -1,7 +1,6 @@
 package org.bittorrentj.message;
 
 import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
-import org.bittorrentj.message.exceptions.IncorrectLengthFieldInMessageException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -13,13 +12,12 @@ import java.nio.ByteBuffer;
 public class UnChoke extends MessageWithLengthAndIdField {
 
     /**
-     * Constructor based off raw wire representation in buffer
+     * Constructor based on wire representation of message.
      * @param src buffer
-     * @throws IncorrectLengthFieldInMessageException when length field does not match computed message length
-     * @throws org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException when id does not match UNCHOKE message id
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id field is invalid
+     * @throws UnrecognizedMessageIdException when id does not match UNCHOKE message id
+     * @throws NonMatchingIdFieldException when id field is invalid
      */
-    public UnChoke(ByteBuffer src) throws IncorrectLengthFieldInMessageException, UnrecognizedMessageIdException, NonMatchingIdFieldException {
+    public UnChoke(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
         super(MessageId.UNCHOKE, src); // Read and process length and id fields
     }
 
@@ -31,7 +29,7 @@ public class UnChoke extends MessageWithLengthAndIdField {
     }
 
     @Override
-    protected void writePayloadToBuffer(ByteBuffer dst) { } // no payload
+    protected void writePayloadToBuffer(ByteBuffer dst) { }
 
     @Override
     int getRawPayloadLength() {

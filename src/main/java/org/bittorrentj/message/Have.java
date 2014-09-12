@@ -24,13 +24,16 @@ public class Have extends MessageWithLengthAndIdField {
         super(MessageId.HAVE);
 
         this.pieceIndex = pieceIndex;
+
+        if(pieceIndex < 0)
+            throw new IllegalArgumentException();
     }
 
     /**
-     * Constructor based of raw wire representation in buffer
+     * Constructor based on wire representation of message.
      * @param src buffer
-     * @throws UnrecognizedMessageIdException
-     * @throws org.bittorrentj.message.exceptions.NonMatchingIdFieldException when id in buffer does not match HAVE message id
+     * @throws UnrecognizedMessageIdException if id is not recognized.
+     * @throws NonMatchingIdFieldException when id in buffer does not match HAVE message id.
      */
     public Have(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException {
 
@@ -46,10 +49,10 @@ public class Have extends MessageWithLengthAndIdField {
      * This routine is not part of constructor because its parameter may not be known at message
      * construction time, e.g. if client only knows info_hash and has to acquire
      * metainfo from peers through.
-     * @param numberOfPiecesInTorrent the number of pieces in the torrent to which this message corresponds
-     * @return true iff the piece index is non-negative and less than parameter
+     * @param numberOfPiecesInTorrent the number of pieces in the torrent to which this message corresponds.
+     * @return true iff the piece index is non-negative and less than parameter.
      */
-    public boolean validatePieceIndex(int numberOfPiecesInTorrent) {
+    public boolean validate(int numberOfPiecesInTorrent) {
         return (this.pieceIndex < 0 || this.pieceIndex >= numberOfPiecesInTorrent);
     }
 
