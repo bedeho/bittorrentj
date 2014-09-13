@@ -9,11 +9,14 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import org.bittorrentj.event.ClientIOFailedEvent;
 import org.bittorrentj.event.Event;
+import org.bittorrentj.exceptions.InvalidMessageRecievedException;
+import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.message.Handshake;
 import org.bittorrentj.message.KeepAlive;
 import org.bittorrentj.message.field.Hash;
-import org.bittorrentj.torrent.Metainfo;
+import org.bittorrentj.torrent.MetaInfo;
 
 /**
  * Created by bedeho on 30.08.2014.
@@ -28,17 +31,12 @@ public class TorrentSwarm extends Thread {
     /**
      * Info_hash for this torrent of corresponding to this torrent swarm
      */
-    private Hash info_hash;
+    private Hash infoHash;
 
     /**
-     * Torrent file metainfo
+     * Torrent file metaInfo
      */
-    private Metainfo metainfo;
-
-    /**
-     * Multiplexing selector for server
-     */
-    private Selector selector;
+    private MetaInfo metaInfo;
 
     /**
      * Client object this swarm belongs to
@@ -150,7 +148,11 @@ public class TorrentSwarm extends Thread {
                 } catch (IOException e) {
                     sendEvent(new ClientIOFailedEvent(e));
 
-                    // remove from hashmap, do we even need hashmap on top of selecter key set?
+                    // remove from hash map, do we even need hash map on top of selector key set?
+                } catch (MessageToLargeForNetworkBufferException e) {
+
+                } catch (InvalidMessageRecievedException e) {
+                    e.printStackTrace();
                 }
             }
 
@@ -210,42 +212,10 @@ public class TorrentSwarm extends Thread {
      */
 
     /**
-     * Number of connections in swarm at present
-     * @return
-     */
-    int getNumberOfPeers() {
-
-        // more complicated?
-        /*
-        synchronized (connections) {
-            return connections.size();
-        }
-        */
-    }
-
-    /**
-     * Indicates whether this swarm accepts more connections
-     * @return
-     */
-    boolean acceptsMoreConnections() {
-
-        // complicated, think more about later
-        /*
-        synchronized (connections) {
-            return connections.size() > maxNumberOfConnections;
-        }
-        */
-    }
-
-    /**
      *
+     * @param connection
      */
-    public void addConnection(SocketChannel channel, Handshake m) {
-
-        //register channel with selector with both opread and opwrite
-    }
-
-    public void closeConnection(Connection connection) {
+    synchronized public void closeConnection(Connection connection) {
 
         // called from process*Netowrk, but perhaps also from Client
         // in response to command, figure this out, and whether we need
@@ -253,17 +223,41 @@ public class TorrentSwarm extends Thread {
     }
 
     /**
+     * Number of connections in swarm at present
+     * @return
+     */
+    synchronized public int getNumberOfPeers() {
+        return connections.size();
+    }
+
+    /**
+     * Indicates whether this swarm accepts more connections
+     * @return
+     */
+    synchronized public boolean acceptsMoreConnections() {
+        return connections.size() > maxNumberOfConnections;
+    }
+
+    /**
+     *
+     */
+    synchronized public void addConnection(SocketChannel channel, Handshake m) {
+
+        //register channel with selector with both opread and opwrite
+    }
+
+    /**
      *
      * @return
      */
-    public void getConnections() {
+    synchronized public void getConnections() {
 
     }
 
     /**
      *
      * @return
-    public ConnectionInformation getConnectionInformation() {
+    synchronized public ConnectionInformation getConnectionInformation() {
 
     }
      */
@@ -271,7 +265,7 @@ public class TorrentSwarm extends Thread {
     /**
      *
      */
-    public void removeConnection(InetSocketAddress address) {
+    synchronized public void removeConnection(InetSocketAddress address) {
         // complicated
     }
 
@@ -292,7 +286,7 @@ synchronized halt()
         call on peers and extensions?
 private findPeers(): called either from begin() or from peerDisconnected(), perhaps this should be moved out
         What do we have available?
-        Metainfo
+        MetaInfo
         go to tracker list (announce or announce-list)
         magnet link
         tracker field present
@@ -329,4 +323,32 @@ private synchronized peerDisconnected(peer)
         remove from peer list ( do we remove a peer which disconnected?)
         if number of connected peers < minimumNumberOfConnections:
         findPeers()
+*/
+
+/*
+        TorrentSwarm()
+
+        if peer supports BEP10, send handshake with torrent.createExtensionHandshakeDictionary()
+
+        while(1) :
+        classic message
+        torrent.processMessage(this, msg)
+        BEP10
+        handshake (note: this may be refreshed)
+        update reverse lookup table
+        extended messages
+        extract extended message ID x
+        map x to local Extension i
+        call torrent.Extension[i].processMessage(this,ByteBuffer)
+        on disconnect exception
+        isConnected = false
+        call torrent.peerDisConnected(this)
+        WHAT DOES THREAD DO, SLEEP ?
+private methods for extensions to call
+private sendExtendedMessage(ByteBuffer/ExtendedMessage) : allows extensions to send messages to peer
+        socket.send(buffer): on disconnect do as in TorrentSwarm() and return false to Extension!! (extension can use to put peer in ban list or something)
+private closeConnection()
+        something?
+private disableExtension() : called to disable itself, perhaps if it is not longer needed
+private enableExtension() called to enable itself, however, how will this ever be called?
 */

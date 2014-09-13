@@ -5,7 +5,7 @@ import java.util.LinkedList;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.field.Hash;
-import org.bittorrentj.torrent.Metainfo;
+import org.bittorrentj.torrent.MetaInfo;
 
 /**
  * Created by bedeho on 30.08.2014.
@@ -88,7 +88,7 @@ public class BitTorrentj {
         //client.registerCommand(new AddTorrentCommand())
     }
 
-    public void addTorrent(Metainfo info) {
+    public void addTorrent(MetaInfo info) {
         //client.registerCommand(new AddTorrentCommand())
     }
 

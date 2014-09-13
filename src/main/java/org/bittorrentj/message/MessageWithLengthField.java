@@ -1,8 +1,8 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.bencodej.exception.DecodingBencodingException;
 import org.bittorrentj.extension.Extension;
-import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
-import org.bittorrentj.message.exceptions.MessageCreationException;
+import org.bittorrentj.message.exceptions.*;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
 import java.nio.ByteBuffer;
@@ -75,7 +75,12 @@ public abstract class MessageWithLengthField extends Message {
      * @throws MessageCreationException
      * @throws UnrecognizedMessageIdException
      */
-    public static MessageWithLengthField create(ByteBuffer src, HashMap<Integer, Extension> activeExtensions) throws MessageCreationException, UnrecognizedMessageIdException, UnsupportedExtendedMessageFoundException {
+    public static MessageWithLengthField create(ByteBuffer src, HashMap<Integer, Extension> activeExtensions) throws
+            MessageCreationException,
+            UnrecognizedMessageIdException,
+            UnsupportedExtendedMessageFoundException,
+            DecodingBencodingException
+            {
 
         // Read length field
         int messageIdAndPayloadSize = src.getInt();

@@ -1,7 +1,5 @@
 package org.bittorrentj.exceptions;
 
-import org.bittorrentj.message.MessageWithLengthField;
-
 /**
  * Created by bedeho on 05.09.2014.
  *

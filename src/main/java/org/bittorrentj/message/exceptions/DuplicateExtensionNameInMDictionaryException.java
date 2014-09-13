@@ -5,5 +5,5 @@ package org.bittorrentj.message.exceptions;
  *
  * Duplicate extension names appear in m key in extended handshake dictionary.
  */
-public class DuplicateExtensionNameInMDictionaryException extends Exception {
+public class DuplicateExtensionNameInMDictionaryException extends MessageCreationException {
 }

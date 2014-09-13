@@ -4,10 +4,9 @@ package org.bittorrentj.message;
  * Created by bedeho on 05.09.2014.
  */
 
+import org.bittorrentj.bencodej.exception.DecodingBencodingException;
 import org.bittorrentj.extension.Extension;
-import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
-import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
-import org.bittorrentj.message.exceptions.MessageCreationException;
+import org.bittorrentj.message.exceptions.*;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -80,9 +79,24 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
      * @return message
      * @throws MessageCreationException if message was malformed in buffer.
      * @throws UnrecognizedMessageIdException if message id field in buffer was not recognized.
-     * @throws org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException if message id field in buffer indicated a BEP20 extension message which is not handshake message.
+     * @throws UnsupportedExtendedMessageFoundException if message id field in buffer indicated a BEP20 extension message which is not handshake message.
      */
-    public static MessageWithLengthAndIdField create(ByteBuffer src, HashMap<Integer, Extension> activeExtensions) throws MessageCreationException, UnrecognizedMessageIdException, UnsupportedExtendedMessageFoundException {
+
+    /**
+     *
+     * @param src
+     * @param activeExtensions
+     * @return
+     * @throws MessageCreationException
+     * @throws UnrecognizedMessageIdException
+     * @throws UnsupportedExtendedMessageFoundException
+     * @throws DecodingBencodingException
+     */
+    public static MessageWithLengthAndIdField create(ByteBuffer src, HashMap<Integer, Extension> activeExtensions) throws
+            MessageCreationException,
+            UnrecognizedMessageIdException,
+            UnsupportedExtendedMessageFoundException,
+            DecodingBencodingException {
 
         // Read raw id, without advancing position
         byte rawId = src.get(src.position() + LENGTH_FIELD_SIZE);
@@ -124,7 +138,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
                     return new ExtendedHandshake(src);
                 else if(activeExtensions.containsKey((int)eRawId)) // we support this extension
                     return activeExtensions.get((int)eRawId).parseMessage(src);
-                else // we dont support this
+                else // we don't support this
                     throw new UnsupportedExtendedMessageFoundException(eRawId);
 
             default:

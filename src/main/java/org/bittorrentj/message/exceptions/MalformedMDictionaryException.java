@@ -5,5 +5,5 @@ package org.bittorrentj.message.exceptions;
  *
  * m key in extended handshake has incorrect structure
  */
-public class MalformedMDictionaryException extends Exception {
+public class MalformedMDictionaryException extends MessageCreationException {
 }

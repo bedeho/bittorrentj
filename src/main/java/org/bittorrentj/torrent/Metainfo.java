@@ -8,7 +8,7 @@ import java.util.LinkedList;
 /**
  * Created by bedeho on 30.08.2014.
  */
-public class Metainfo {
+public class MetaInfo {
 
     /**
      * Describes the file(s) of the torrent.
@@ -55,7 +55,7 @@ public class Metainfo {
      * Constructor loading metainfo from .torrent file
      * @param filename name of .torrent file
      */
-    public Metainfo(String filename) {
+    public MetaInfo(String filename) {
 
     }
 
@@ -69,7 +69,7 @@ public class Metainfo {
      * @param created_by
      * @param encoding
      */
-    public Metainfo(Info info, String announce, LinkedList<String> announce_list, Date creation_date,  String comment, String created_by, String encoding) {
+    public MetaInfo(Info info, String announce, LinkedList<String> announce_list, Date creation_date, String comment, String created_by, String encoding) {
 
         this.info = info;
         this.announce = announce;

@@ -5,5 +5,5 @@ package org.bittorrentj.message.exceptions;
  *
  * m key in extended handshake dictionary is not present
  */
-public class PayloadDoesNotContainMDictionaryException extends Exception {
+public class PayloadDoesNotContainMDictionaryException extends MessageCreationException {
 }

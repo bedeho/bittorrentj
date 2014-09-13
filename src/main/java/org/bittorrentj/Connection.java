@@ -1,10 +1,10 @@
 package org.bittorrentj;
 
+import org.bittorrentj.exceptions.InvalidMessageRecievedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.Message;
 import org.bittorrentj.message.MessageWithLengthField;
-import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -106,17 +106,22 @@ public class Connection {
     public final static int NETWORK_READ_BUFFER_SIZE = 10 * 1024 * 1024;
 
     /**
-     * Position in position in networkReadBuffer where data
+     * Position in networkReadBuffer where data
      * begins which has not been processed by readMessagesFromChannel() and
      * subsequently turned into a message in readMessagesQueue
      */
-    private int currentReadBufferPosition;
+    private int startPositionOfDataInReadBuffer;
     private int copyAtEdgeEvent; // purely a performance statistic to assess whether circluar buffer is needed
 
     /**
      * Queue of messages which have been read but not processed
      */
     private LinkedList<Message> readMessagesQueue;
+
+    /**
+     * Queue of messages which have been read but not processed
+     */
+    private LinkedList<Message> writeMessagesQueue;
 
     /**
      * Maps extension id to corresponding handler so that
@@ -127,7 +132,7 @@ public class Connection {
     // MappedByteBuffer <-- memory mapped
 
     /**
-     *
+     * Constructor
      */
     public Connection(HashMap<Integer, Extension> activeExtensions) {
 
@@ -139,7 +144,7 @@ public class Connection {
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
         this.readMessagesQueue = new LinkedList<Message>();
 
-        this.currentReadBufferPosition = 0;
+        this.startPositionOfDataInReadBuffer = 0;
         this.copyAtEdgeEvent = 0;
     }
 
@@ -147,90 +152,160 @@ public class Connection {
      * Attempts to read from channel when OP_READ is registered,
      * and put full messages in readMessagesQueue.
      */
-    public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException {
+    public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageRecievedException {
 
         // The number of bytes read from socket into read buffer in last iteration of next loop
         int numberOfBytesRead;
 
-        // Read from channel into network read buffer so long as we can,
-        // this may be possible multiple times if read buffer is comparatively
-        // smaller compared to kernel socket buffer and incoming traffic/bandwidth
+        /**
+         * Read from channel into network read buffer so long as we can,
+         * this may be possible multiple times if read buffer is comparatively
+         * smaller compared to kernel socket buffer and incoming traffic/bandwidth.
+         */
         while((numberOfBytesRead = channel.read(networkReadBuffer)) > 0) {
 
+            // Note where in buffer data ends
+            int endPositionOfDataInReadBuffer = networkReadBuffer.position();
+
             // Each iteration attempts to read one message from channel buffer
-            int remainingBufferSize;
+            int numberOfUnconsumedBytes;
             while (true) {
 
                 // Remaining space in buffer which has not been processed into a message
-                remainingBufferSize = networkReadBuffer.position() - currentReadBufferPosition;
+                numberOfUnconsumedBytes = endPositionOfDataInReadBuffer - startPositionOfDataInReadBuffer;
 
-                // Do we have enough space in buffer for length field of new message?,
-                // if not we are done reading from buffer, and we stop without
-                // advancing buffer read position.
-                if (remainingBufferSize < MessageWithLengthField.LENGTH_FIELD_SIZE)
+                /**
+                * Do we have enough space in buffer for length field of new message?,
+                * if not we are done reading from buffer, and we stop without
+                * advancing buffer read position.
+                */
+                if (numberOfUnconsumedBytes < MessageWithLengthField.LENGTH_FIELD_SIZE)
                     break;
 
-                // Read length field of new message in as four byte big-endian integer
-                int messageIdAndPayloadSize = networkReadBuffer.getInt(currentReadBufferPosition);
+                // Read length field of new message in as four byte big-endian integer, without altering buffer position
+                int messageIdAndPayloadSize = networkReadBuffer.getInt(startPositionOfDataInReadBuffer);
 
                 // Get total size of message as claimed by length field
                 int totalMessageSize = MessageWithLengthField.LENGTH_FIELD_SIZE + messageIdAndPayloadSize;
 
-                // Check if peer is attempting to send a message we can never process,
-                // that is a message greater than read buffer. If so we throw an exception.
+                /**
+                * Check if peer is attempting to send a message we can never process,
+                * that is a message greater than read buffer. If so we throw an exception.
+                */
                 if (totalMessageSize > NETWORK_READ_BUFFER_SIZE)
                     throw new MessageToLargeForNetworkBufferException(totalMessageSize, NETWORK_READ_BUFFER_SIZE);
 
-                // Check that buffer does contain a full new message,
-                // that is: <length><id><payload>.
-                // if not we are done reading from buffer, and we stop without
-                // advancing buffer read position.
-                if (remainingBufferSize >= totalMessageSize) {
+                /**
+                 * Check that buffer does contain a full new message,
+                 * that is: <length><id><payload>.
+                 * if not we are done reading from buffer, and we stop without
+                 * advancing buffer read position.
+                 */
+                if (numberOfUnconsumedBytes >= totalMessageSize) {
 
                     // Wrap in a temporary read only buffer
-                    ByteBuffer temporaryBuffer = ByteBuffer.wrap(networkReadBuffer ??).asReadOnlyBuffer();
+                    ByteBuffer temporaryBuffer = networkReadBuffer.duplicate().asReadOnlyBuffer();
 
-                    // Generate a new message
+                    // and make sure this buffer starts where message starts
+                    temporaryBuffer.position(startPositionOfDataInReadBuffer);
+
+                    // and ends where message ends
+                    temporaryBuffer.limit(startPositionOfDataInReadBuffer + totalMessageSize);
+
+                    // Process buffer and generate new message
                     MessageWithLengthField m;
 
                     try {
                         m = MessageWithLengthField.create(temporaryBuffer, activeExtensions);
-                    } catch (UnsupportedExtendedMessageFoundException e) {
-
-                        //
-
+                    } catch (Exception e){
+                        throw new InvalidMessageRecievedException(e);
                     }
 
                     // Save message in read queue
                     readMessagesQueue.add(m);
-                }
 
-                // Advance position in buffer
-                currentReadBufferPosition += messageIdAndPayloadSize;
+                    // Advance position in buffer
+                    startPositionOfDataInReadBuffer += messageIdAndPayloadSize;
+                }
             }
 
             // If buffer is completely consumed, then we reset it
             // to postpone copy at edge event
-            if (remainingBufferSize == 0) {
-                networkReadBuffer.reset();
-                currentReadBufferPosition = 0;
+            if (numberOfUnconsumedBytes == 0) {
+                networkReadBuffer.clear();
+                startPositionOfDataInReadBuffer = 0;
             } else if (!networkReadBuffer.hasRemaining()) {
 
                 // If unconsumed data touches buffer limit,
-                // then copy to the front of the buffer
+                // then copy to the front of the buffer.
 
-                do_copying_to_front_here
+                // We use compact() to do this, and therefor we have to
+                // first set position to data we want at start of buffer
+                networkReadBuffer.position(startPositionOfDataInReadBuffer);
 
+                // and then limit is set to end of data.
+                networkReadBuffer.limit(endPositionOfDataInReadBuffer);
+
+                // Do copying
+                networkReadBuffer.compact();
+
+                // Note this compacting event, since its costly.
                 copyAtEdgeEvent++;
             }
         }
     }
 
     /**
-     * Attempts to write to channel when OP_WRITE is registered
+     * Attempts to write to channel when OP_WRITE is registered,
+     * by writing messages from writeMessagesQueue.
      */
-    public void writeMessagesToChannel() {
+    public void writeMessagesToChannel() throws IOException, MessageToLargeForNetworkBufferException {
 
+        // The number of bytes written into socket from write buffer in last iteration of next loop
+        int numberOfBytesWritten = 0;
+
+        do {
+
+            // Does buffer have anything to be written
+            if(!networkWriteBuffer.hasRemaining()) {
+
+                // Clear buffer: pos = 0, lim = cap, mark discarded
+                networkWriteBuffer.clear();
+
+                // If we still have messages to write, then fill buffer
+                if(!writeMessagesQueue.isEmpty()) {
+
+                    // Get message
+                    Message m = writeMessagesQueue.poll();
+
+                    // Is there space in buffer? otherwise throw exception
+                    int messageLength = m.getRawMessageLength();
+                    if(messageLength > NETWORK_WRITE_BUFFER_SIZE)
+                        throw new MessageToLargeForNetworkBufferException(messageLength, NETWORK_WRITE_BUFFER_SIZE);
+
+                    // Write raw message into network buffer
+                    m.writeMessageToBuffer(networkWriteBuffer);
+
+                    // Write buffer to socket
+                    networkWriteBuffer.flip(); // make limit= position and position = 0, to facilitate writing into socket
+                    numberOfBytesWritten = channel.write(networkWriteBuffer);
+
+                } else
+                    numberOfBytesWritten = 0; // otherwise we are done
+
+            } else
+                numberOfBytesWritten = channel.write(networkWriteBuffer); // write what is in buffer to socket
+
+        } while(numberOfBytesWritten > 0); // We are done for now if we can't write to socket right now
+
+    }
+
+    /**
+     *
+     * @param m
+     */
+    public void enqueueMessageForSending(Message m) {
+        writeMessagesQueue.add(m);
     }
 
     public Date getTimeLastDataSent() {
@@ -249,37 +324,3 @@ public class Connection {
         this.timeLastDataReceived = timeLastDataReceived;
     }
 }
-
-/*
-fields
-
-        isConnected
-        constructor(socket, peer_id, reserved, torrent)
-        save fields
-        isConnected = true
-        TorrentSwarm()
-
-        if peer supports BEP10, send handshake with torrent.createExtensionHandshakeDictionary()
-
-        while(1) :
-        classic message
-        torrent.processMessage(this, msg)
-        BEP10
-        handshake (note: this may be refreshed)
-        update reverse lookup table
-        extended messages
-        extract extended message ID x
-        map x to local Extension i
-        call torrent.Extension[i].processMessage(this,ByteBuffer)
-        on disconnect exception
-        isConnected = false
-        call torrent.peerDisConnected(this)
-        WHAT DOES THREAD DO, SLEEP ?
-private methods for extensions to call
-private sendExtendedMessage(ByteBuffer/ExtendedMessage) : allows extensions to send messages to peer
-        socket.send(buffer): on disconnect do as in TorrentSwarm() and return false to Extension!! (extension can use to put peer in ban list or something)
-private closeConnection()
-        something?
-private disableExtension() : called to disable itself, perhaps if it is not longer needed
-private enableExtension() called to enable itself, however, how will this ever be called?
-*/

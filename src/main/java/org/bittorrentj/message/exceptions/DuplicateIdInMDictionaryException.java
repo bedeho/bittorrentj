@@ -5,5 +5,5 @@ package org.bittorrentj.message.exceptions;
  *
  * Two extensions have identical ids in the m key of a extended handshake dictionary.
  */
-public class DuplicateIdInMDictionaryException extends Exception {
+public class DuplicateIdInMDictionaryException extends MessageCreationException {
 }
