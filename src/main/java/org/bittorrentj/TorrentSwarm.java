@@ -11,7 +11,7 @@ import java.util.Iterator;
 
 import org.bittorrentj.event.ClientIOFailedEvent;
 import org.bittorrentj.event.Event;
-import org.bittorrentj.exceptions.InvalidMessageRecievedException;
+import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.message.Handshake;
 import org.bittorrentj.message.KeepAlive;
@@ -53,12 +53,24 @@ public class TorrentSwarm extends Thread {
      */
     private int maxNumberOfConnections;
 
+    /**
+     * The maximum number of peers to upload to simultaneously
+     */
     private int maxNumberOfUploads;
 
+    /**
+     * Maximum net upload speed
+     */
     private int maxUploadSpeed;
 
+    /**
+     * Torrent meta information
+     */
     private MetaInfo mInfo;
 
+    /**
+     * Torrent (meta)info hash
+     */
     private Hash info_hash;
 
     /**
@@ -107,7 +119,6 @@ public class TorrentSwarm extends Thread {
 
             // Process network channel events
             processNetwork();
-
         }
     }
 
@@ -132,10 +143,10 @@ public class TorrentSwarm extends Thread {
 
                 SelectionKey key = (SelectionKey) i.next();
 
-                try {
+                // Get connection
+                Connection connection = (Connection)key.attachment();
 
-                    // Get connection
-                    Connection connection = (Connection)key.attachment();
+                try {
 
                     // Ready to be read
                     if (key.isReadable())
@@ -146,53 +157,52 @@ public class TorrentSwarm extends Thread {
                         connection.writeMessagesToChannel();
 
                 } catch (IOException e) {
+                    // Notify client
                     sendEvent(new ClientIOFailedEvent(e));
-
-                    // remove from hash map, do we even need hash map on top of selector key set?
                 } catch (MessageToLargeForNetworkBufferException e) {
 
-                } catch (InvalidMessageRecievedException e) {
-                    e.printStackTrace();
+                } catch (InvalidMessageReceivedException e) {
+
+                } finally {
+                    // Close connection with this peer
+                    closeConnection(connection);
                 }
             }
-
-            // Process each connection, and remove key from selected key set
-            i = selector.selectedKeys().iterator();
-
-            while (i.hasNext()) {
-
-                SelectionKey key = (SelectionKey) i.next();
-
-                // Remove from selected key set,
-                // otherwise it sticks around even after next select() call
-                i.remove();
-
-                // Process channel
-                processNetworkEvents(key);
-            }
         }
+
+        // Process each key and corresponding connection
+        for(SelectionKey key : selector.keys()) {
+
+            // Process connection
+            processKey(key);
+
+            // Remove from selected key set if present
+            if(selector.selectedKeys().contains(key))
+                selector.selectedKeys().remove(key);
+        }
+    }
+
+    /**
+     * Process each key and corresponding connection
+     * @param key
+     */
+    private void processKey(SelectionKey key) {
+
+        // Get connection
+        Connection connection = (Connection)key.attachment();
 
         // Disconnect connections which have taken to long to talk to us,
         // send keep-alive if we have not written anything in a while
         long nowDateInMs = new Date().getTime();
 
-        for(SelectionKey key : selector.keys()) {
+        // Close if it has taken more time than upper limit,
+        // otherwise send keep-alive if we have not written in a while
+        if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
+            closeConnection(connection);
+        else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
+            connection.enqueueMessageForSending(new KeepAlive());
 
-            // Get connection
-            Connection connection = (Connection)key.attachment();
-
-            // Close if it has taken more time than upper limit,
-            // otherwise send keep-alive if we have not written in a while
-            if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
-                closeConnection(connection);
-            else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
-                connection.enqueueMessageForSending(new KeepAlive());
-        }
-    }
-
-    // Does something when there is some channel read/write event
-    private void processNetworkEvents(SelectionKey key) {
-
+        // Process new message
     }
 
     /**
@@ -220,6 +230,12 @@ public class TorrentSwarm extends Thread {
         // called from process*Netowrk, but perhaps also from Client
         // in response to command, figure this out, and whether we need
         // synching. this informs whetehr routine should be public or private
+
+
+        // actually close connection.close -> what does this do with selector?
+        // remove from connections hashmap
+        // what to do about various buffer is in connection, and also in diskmanager?
+
     }
 
     /**

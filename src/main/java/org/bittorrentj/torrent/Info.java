@@ -18,7 +18,6 @@ public abstract class Info {
      */
     private int pieceLength;
 
-
     /**
      *  String consisting of the concatenation of all
      *  20-byte SHA1 hash values, one per piece (byte string, i.e. not urlencoded)

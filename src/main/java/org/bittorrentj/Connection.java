@@ -1,6 +1,6 @@
 package org.bittorrentj;
 
-import org.bittorrentj.exceptions.InvalidMessageRecievedException;
+import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.Message;
@@ -86,16 +86,6 @@ public class Connection {
     private SocketChannel channel;
 
     /**
-     * Write buffer for network
-     */
-    private ByteBuffer networkWriteBuffer;
-
-    /**
-     * Size (bytes) of networkWriteBuffer
-     */
-    private final static int NETWORK_WRITE_BUFFER_SIZE = 10 * 1024 * 1024;
-
-    /**
      * Read buffer for network
      */
     private ByteBuffer networkReadBuffer;
@@ -112,6 +102,23 @@ public class Connection {
      */
     private int startPositionOfDataInReadBuffer;
     private int copyAtEdgeEvent; // purely a performance statistic to assess whether circluar buffer is needed
+
+    /**
+     * Write buffer for network
+     */
+    private ByteBuffer networkWriteBuffer;
+
+    /**
+     * Size (bytes) of networkWriteBuffer
+     */
+    private final static int NETWORK_WRITE_BUFFER_SIZE = 10 * 1024 * 1024;
+
+    /**
+     * The number of bytes in the write buffer.
+     * We cannot use hasRemaining on buffer, since that
+     * can also be state when buffer is perfectly empty.
+     */
+    private int bytesInWriteBuffer;
 
     /**
      * Queue of messages which have been read but not processed
@@ -144,6 +151,7 @@ public class Connection {
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
         this.readMessagesQueue = new LinkedList<Message>();
 
+        this.bytesInWriteBuffer = 0;
         this.startPositionOfDataInReadBuffer = 0;
         this.copyAtEdgeEvent = 0;
     }
@@ -152,7 +160,7 @@ public class Connection {
      * Attempts to read from channel when OP_READ is registered,
      * and put full messages in readMessagesQueue.
      */
-    public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageRecievedException {
+    public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
 
         // The number of bytes read from socket into read buffer in last iteration of next loop
         int numberOfBytesRead;
@@ -218,7 +226,7 @@ public class Connection {
                     try {
                         m = MessageWithLengthField.create(temporaryBuffer, activeExtensions);
                     } catch (Exception e){
-                        throw new InvalidMessageRecievedException(e);
+                        throw new InvalidMessageReceivedException(e);
                     }
 
                     // Save message in read queue
@@ -252,6 +260,10 @@ public class Connection {
                 // Note this compacting event, since its costly.
                 copyAtEdgeEvent++;
             }
+
+            if(numberOfBytesRead > 0);
+                // log bytes written
+
         }
     }
 
@@ -267,7 +279,7 @@ public class Connection {
         do {
 
             // Does buffer have anything to be written
-            if(!networkWriteBuffer.hasRemaining()) {
+            if(bytesInWriteBuffer == 0) { // <--------------- this does not work!!!!
 
                 // Clear buffer: pos = 0, lim = cap, mark discarded
                 networkWriteBuffer.clear();
@@ -282,6 +294,8 @@ public class Connection {
                     int messageLength = m.getRawMessageLength();
                     if(messageLength > NETWORK_WRITE_BUFFER_SIZE)
                         throw new MessageToLargeForNetworkBufferException(messageLength, NETWORK_WRITE_BUFFER_SIZE);
+                    else
+                        bytesInWriteBuffer = messageLength; // buffer will be filled with message
 
                     // Write raw message into network buffer
                     m.writeMessageToBuffer(networkWriteBuffer);
@@ -295,6 +309,12 @@ public class Connection {
 
             } else
                 numberOfBytesWritten = channel.write(networkWriteBuffer); // write what is in buffer to socket
+
+            if(numberOfBytesWritten > 0);
+                // log data sent
+
+            // Update number of bytes in buffer
+            bytesInWriteBuffer -= numberOfBytesWritten;
 
         } while(numberOfBytesWritten > 0); // We are done for now if we can't write to socket right now
 
