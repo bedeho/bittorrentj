@@ -1,7 +1,7 @@
 package org.bittorrentj.message;
 
+import org.bittorrentj.message.exceptions.InvalidMessageLengthFieldException;
 import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;
-import org.bittorrentj.message.exceptions.InvalidBitFieldLengthInBitFieldMessageException;
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.exceptions.UnrecognizedMessageIdException;
 
@@ -36,9 +36,9 @@ public class BitField extends MessageWithLengthAndIdField {
      * @param src buffer
      * @throws UnrecognizedMessageIdException if message id field is not recognized.
      * @throws NonMatchingIdFieldException if message id field in buffer does not match BITFIELD message id.
-     * @throws InvalidBitFieldLengthInBitFieldMessageException if header length field implies non-positive byte length bitField.
+     * @throws org.bittorrentj.message.exceptions.InvalidMessageLengthFieldException if header length field implies non-positive byte length bitField.
      */
-    public BitField(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException, InvalidBitFieldLengthInBitFieldMessageException {
+    public BitField(ByteBuffer src) throws UnrecognizedMessageIdException, NonMatchingIdFieldException, InvalidMessageLengthFieldException {
 
         // Read length and id fields
         super(MessageId.BITFIELD, src);
@@ -48,7 +48,7 @@ public class BitField extends MessageWithLengthAndIdField {
 
         // Verify that length field is not malicious
         if(byteLengthOfBitfield <= 0)
-            throw new InvalidBitFieldLengthInBitFieldMessageException(byteLengthOfBitfield);
+            throw new InvalidMessageLengthFieldException(byteLengthOfBitfield);
 
         // Copy from byte buffer into a byte array,
         // and then convert to boolean bitField
@@ -79,6 +79,33 @@ public class BitField extends MessageWithLengthAndIdField {
         }
 
         return binaryBitfield;
+    }
+
+    /**
+     * Converts a compact byte array representation of a bit field
+     * to a boolean array representation.
+     * @param b byte representation.
+     * @param numberOfBits boolean array representation.
+     * @return
+     */
+    public static boolean[] byteToBooleanBitField(byte[] b, int numberOfBits) {
+
+        boolean [] bitfield = new boolean[numberOfBits];
+
+        for(int i = 0;i < numberOfBits;i++)
+            bitfield[i] = getPieceAvailability(b, i);
+
+        return bitfield;
+    }
+
+    /**
+     * Returns boolean array version of bitfield.
+     *
+     * @param numberOfBits
+     * @return
+     */
+    public boolean[] getBooleanBitField(int numberOfBits) {
+        return byteToBooleanBitField(bitField, numberOfBits);
     }
 
     /**

@@ -51,7 +51,7 @@ public abstract class MessageWithLengthField extends Message {
 
         // Save that buffer constructor was used,
         // this allows getMessageLengthField() to be called without the
-        // IllegalStateException exception
+        // IllegalStateException exceptions
         this.bufferConstructorUsed = true;
     }
 
@@ -62,7 +62,7 @@ public abstract class MessageWithLengthField extends Message {
     protected MessageWithLengthField() {
 
         // Save that buffer constructor was not used,
-        // this causes getMessageLengthField() to throw the IllegalStateException exception
+        // this causes getMessageLengthField() to throw the IllegalStateException exceptions
         this.bufferConstructorUsed = false;
     }
 

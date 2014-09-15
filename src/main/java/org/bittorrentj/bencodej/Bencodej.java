@@ -24,7 +24,7 @@ public abstract class Bencodej {
     /**
      * Decodes bencoding. After successful return
      * the input buffer will have position after end
-     * of bencoding. If exception is thrown, the position
+     * of bencoding. If exceptions is thrown, the position
      * is set to where last successful read was made.
      * @param src bencoding
      * @return decoded object
@@ -36,7 +36,7 @@ public abstract class Bencodej {
         byte delimiter = src.get(src.position());
 
         // Call upon the correct constructor, or throw
-        // exception if delimiter is not recognized.
+        // exceptions if delimiter is not recognized.
         if(delimiter == 'i')
             return new BencodableInteger(src);
         else if(delimiter == 'l')

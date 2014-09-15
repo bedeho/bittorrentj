@@ -6,7 +6,7 @@ package org.bittorrentj.exceptions;
 public class InvalidMessageReceivedException extends Exception {
 
     /**
-     * The actual exception
+     * The actual exceptions
      */
     private Exception actualException;
 

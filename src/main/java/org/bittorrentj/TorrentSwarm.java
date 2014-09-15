@@ -5,20 +5,17 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 
 import org.bittorrentj.event.ClientIOFailedEvent;
 import org.bittorrentj.event.Event;
-import org.bittorrentj.exceptions.InvalidMessageReceivedException;
-import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
+import org.bittorrentj.exceptions.*;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.message.field.MessageId;
-import org.bittorrentj.torrent.Info;
 import org.bittorrentj.torrent.MetaInfo;
 
 /**
@@ -37,9 +34,9 @@ public class TorrentSwarm extends Thread {
     private Hash infoHash;
 
     /**
-     * Torrent file metaInfo
+     * Torrent file meta information
      */
-    private MetaInfo metaInfo;
+    private MetaInfo metaInformation;
 
     /**
      * Client object this swarm belongs to
@@ -67,21 +64,6 @@ public class TorrentSwarm extends Thread {
     private int maxUploadSpeed;
 
     /**
-     * Torrent meta information
-     */
-    private MetaInfo mInfo;
-
-    /**
-     * Torrent (meta)info hash
-     */
-    private Hash info_hash;
-
-    /**
-     *
-     */
-    private Info metadata;
-
-    /**
      * Maps the name to the extension for all installed extensions for this swarm.
      */
     private HashMap<Integer, Extension> activeClientExtensions;
@@ -104,6 +86,15 @@ public class TorrentSwarm extends Thread {
      */
     private final static int KEEP_ALIVE_INTERVAL = 60*1000;
 
+    /**
+     * Received bit field message. Starts out as null, and
+     * is evenutally set when messaga arrives. If the metadata
+     * is known when the message arrives, then piece availability
+     * of the peer can be set, otherwise this availability must
+     * be set by the BEP9 extension which also sets the metadata.
+     */
+    private BitField receivedBitField;
+
     // diskworker?
 
     // State
@@ -113,11 +104,12 @@ public class TorrentSwarm extends Thread {
      */
     private boolean [] globalPieceAvailability;
 
-    public TorrentSwarm(Hash info_hash, Info metadata, HashMap<Integer, Extension> activeClientExtensions) {
+    public TorrentSwarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions) {
 
-        this.info_hash = info_hash;
-        this.metadata = metadata;
+        this.infoHash = infoHash;
+        this.metaInformation = metaInformation;
         this.activeClientExtensions = activeClientExtensions;
+        this.receivedBitField = null;
 
         try {
             this.selector = Selector.open();
@@ -125,6 +117,7 @@ public class TorrentSwarm extends Thread {
             System.out.println("How can we possibly end up here"); // log later or something
         }
 
+        //
         //this.globalPieceAvailability =
 
                 //Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
@@ -139,6 +132,38 @@ public class TorrentSwarm extends Thread {
 
             // Process network channel events
             processNetwork();
+
+            /**
+             * processOther things??
+             *
+             *
+             // So we dealt with all those messages, anything else we do...
+
+             // process event where a piece which was finally written to disk!!
+             *
+             */
+
+
+            /**
+             *
+             *             // Disconnect connections which have taken to long to talk to us,
+             // send keep-alive if we have not written anything in a while
+             long nowDateInMs = new Date().getTime();
+
+             // Close if it has taken more time than upper limit,
+             // otherwise send keep-alive if we have not written in a while
+             if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
+             closeConnection(connection);
+             else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
+             connection.enqueueMessageForSending(new KeepAlive());
+             *
+             */
+
+            // if we have to few connections now, how do we get more peers?
+
+
+
+
         }
     }
 
@@ -153,89 +178,70 @@ public class TorrentSwarm extends Thread {
             System.out.println("what can causes us to come here????"); // <= logg later in log4j
         }
 
-        // Process any potential channel events
-        if(numberOfUpdatedKeys > 0) {
+        // Iterate keys and process read/write events
+        Iterator i = selector.selectedKeys().iterator();
 
-            // Iterate keys and process read/write events
-            Iterator i = selector.selectedKeys().iterator();
+        while (i.hasNext()) {
 
-            while (i.hasNext()) {
+            SelectionKey key = (SelectionKey) i.next();
 
-                SelectionKey key = (SelectionKey) i.next();
+            // Get connection
+            Connection connection = (Connection)key.attachment();
 
-                // Get connection
-                Connection connection = (Connection)key.attachment();
-
-                try {
-
-                    // Ready to be read
-                    if (key.isReadable())
-                        connection.readMessagesFromChannel();
-
-                    // Ready to be written to
-                    if (key.isWritable())
-                        connection.writeMessagesToChannel();
-
-                } catch (IOException e) {
-                    // Notify client
-                    sendEvent(new ClientIOFailedEvent(e));
-                } catch (MessageToLargeForNetworkBufferException e) {
-
-                } catch (InvalidMessageReceivedException e) {
-
-                } finally {
-                    // Close connection with this peer
-                    closeConnection(connection);
-                }
-            }
-        }
-
-        // Process each key and corresponding connection
-        for(SelectionKey key : selector.keys()) {
-
-            // Process connection
-            processKey(key);
-
-            // Remove from selected key set if present
-            if(selector.selectedKeys().contains(key))
-                selector.selectedKeys().remove(key);
-        }
-    }
-
-    /**
-     * Process each key and corresponding connection
-     * @param key
-     */
-    private void processKey(SelectionKey key) {
-
-        // Get connection
-        Connection connection = (Connection)key.attachment();
-
-        // Disconnect connections which have taken to long to talk to us,
-        // send keep-alive if we have not written anything in a while
-        long nowDateInMs = new Date().getTime();
-
-        // Close if it has taken more time than upper limit,
-        // otherwise send keep-alive if we have not written in a while
-        if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
-            closeConnection(connection);
-        else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
-            connection.enqueueMessageForSending(new KeepAlive());
-
-        // Process new message
-        MessageWithLengthField m;
-        while((m = connection.getNextReceivedMessage()) != null) {
+            // Remove key from selected key set
+            selector.selectedKeys().remove(key);
 
             try {
-                processMessage(m, connection);
-            } catch (UnsupportedExtendedMessageFoundException e) {
+
+                // Ready to be read
+                if (key.isReadable()) {
+
+                    // Read from channel
+                    connection.readMessagesFromChannel();
+
+                    // Process new message
+                    MessageWithLengthField m;
+                    while((m = connection.getNextReceivedMessage()) != null) {
+
+                        try {
+                            processMessage(m, connection);
+                        } catch (UnsupportedExtendedMessageFoundException e) {
+                            closeConnection(connection);
+                            //return;
+                            // or just ignore ?
+                        } catch (ReceivedBitFieldMoreThanOnce e) {
+                            closeConnection(connection);
+                            //return;
+                            // or just ignore ?
+                        } catch (InvalidPieceIndexInHaveMessage e) {
+                            closeConnection(connection);    
+                            //return;
+                            // or just ignore ?
+                        } catch (InvalidBitFieldMessage e) {
+
+                        }
+                    }
+                }
+
+                // Ready to be written to
+                if (key.isWritable())
+                    connection.writeMessagesToChannel();
+
+            } catch (IOException e) {
+                // Notify client
+                sendEvent(new ClientIOFailedEvent(e));
+
+                //// closeConnection(connection); ????
+
+            } catch (MessageToLargeForNetworkBufferException e) {
+
+            } catch (InvalidMessageReceivedException e) {
+
+            } finally {
+                // Close connection with this peer
                 closeConnection(connection);
-                return;
-                // or just ignore ?
             }
         }
-
-        // So we dealt with all those messages, anything else we do...
     }
 
     /**
@@ -243,7 +249,17 @@ public class TorrentSwarm extends Thread {
      * @param m message
      * @param connection connection
      */
-    private void processMessage(MessageWithLengthField m, Connection connection) throws UnsupportedExtendedMessageFoundException {
+    private void processMessage(MessageWithLengthField m, Connection connection) throws
+            UnsupportedExtendedMessageFoundException,
+            ReceivedBitFieldMoreThanOnce,
+            InvalidPieceIndexInHaveMessage,
+            InvalidBitFieldMessage {
+
+        // should we move this method into connection class perhaps? since it is on a per connection basis, and then pass in suplementary info like metainfo etc.??
+        // write out, then see.
+
+
+
 
         /**
          * Does it have id?, if not, then its just a keep-alive message,
@@ -282,13 +298,45 @@ public class TorrentSwarm extends Thread {
                 case HAVE:
 
                     // Peer has a new piece
-                    connection.getPeerState().setInterested(true);
+
+                    // Do we have metainfo yet
+                    if(isMetaInformationKnown()) {
+
+                        Have haveMessage = (Have)m;
+
+                        // Check that have message is indeed valid
+                        int numberOfPiecesInTorrent = metaInformation.getNumberOfPiecesInTorrent();
+                        if(haveMessage.validate(numberOfPiecesInTorrent))
+                            connection.getPeerState().isPieceAvailable(haveMessage.getPieceIndex()); // and alter availability based on it
+                        else
+                            throw new InvalidPieceIndexInHaveMessage(haveMessage.getPieceIndex(), numberOfPiecesInTorrent); // or throw exceptions if invalid
+                    }
 
                     break;
                 case BITFIELD:
 
-                    // Update peer state
-                    //connection.getPeerState().
+                    // Peer announces what pieces it has
+
+                    // If we have already received this message, we raise an exception, since it should only be sent once.
+                    if(receivedBitField != null)
+                        throw new ReceivedBitFieldMoreThanOnce();
+                    else {
+
+                        // otherwise save it the first time
+                        receivedBitField = (BitField)m;
+
+                        // If meta information is known, then update piece availability
+                        if(isMetaInformationKnown()) {
+
+                            int numberOfPieces = metaInformation.getNumberOfPiecesInTorrent();
+
+                            // Check that message is valid, given the number of pieces in torrent
+                            if(!receivedBitField.validateBitField(numberOfPieces))
+                                throw new InvalidBitFieldMessage(receivedBitField);
+                            else // and then alter peer piece availability based
+                                connection.getPeerState().setPieceAvailability(receivedBitField.getBooleanBitField(numberOfPieces));
+                        }
+                    }
 
                     break;
                 case REQUEST:
@@ -337,7 +385,6 @@ public class TorrentSwarm extends Thread {
                                 // If we have this extension enabled, then call initialization routine
                                 if (activeClientExtensions.containsKey(name))
                                     activeClientExtensions.get(name).init(connection);
-
                             }
                         }
 
@@ -361,7 +408,7 @@ public class TorrentSwarm extends Thread {
      * after creating a message:
      * ------------------------
      * if its a bitfield, check that it matches the number of pieces,if we know that number
-     * throw new InvalidBitFieldLengthInBitFieldMessageException(bitfield.length, numberOfPiecesInTorrent);
+     * throw new InvalidMessageLengthFieldException(bitfield.length, numberOfPiecesInTorrent);
      *
      * if its a piece, check that: Check that it is non-negative and also not to large
      if throw new InvalidPieceIndexInHaveMessage(this.pieceIndex, numberOfPiecesInTorrent);
@@ -379,7 +426,7 @@ public class TorrentSwarm extends Thread {
      */
     synchronized public void closeConnection(Connection connection) {
 
-        // called from process*Netowrk, but perhaps also from Client
+        // called from process*Network, but perhaps also from Client
         // in response to command, figure this out, and whether we need
         // synching. this informs whetehr routine should be public or private
 
@@ -389,7 +436,7 @@ public class TorrentSwarm extends Thread {
         // what to do about various buffer is in connection, and also in diskmanager?
 
 
-        // if we have to few connections now, how do we get more peers?
+
     }
 
     /**
@@ -416,6 +463,13 @@ public class TorrentSwarm extends Thread {
         //register channel with selector with both opread and opwrite
 
         // new connection (PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions)
+
+        /*
+        public synchronized addPeer(socket, peer_id, reserved) : for when a peer connects and gives you all this info :called by, at thisp point the peer
+        p = new Peer(socket, peer_id, reserved, ExtensionsManager [])
+        peers.add(p)
+        p.start()
+        */
 
         // new peer state (Handshake m, HashMap<Integer, Extension> activeExtensions, boolean [] clientPieceAvailability
     }
@@ -452,84 +506,9 @@ public class TorrentSwarm extends Thread {
     }
 
     /**
-     * Checks whether we have yet learned metadata. It may
+     * Checks whether we have yet learned MetaInfoHash. It may
      * require BEP9 extension to learn if we just knew info_hash to begin with.
      * @return
      */
-    private boolean metadataIsKnown() { return metadata != null;}
+    private boolean isMetaInformationKnown() { return metaInformation != null;}
 }
-/*
-        do we have peers??? reconnect?
-        findPeers()
-        WHAT DOES THREAD DO, SLEEP ?
-synchronized halt()
-        check that we we are alredy running??
-        call on peers and extensions?
-private findPeers(): called either from begin() or from peerDisconnected(), perhaps this should be moved out
-        What do we have available?
-        MetaInfo
-        go to tracker list (announce or announce-list)
-        magnet link
-        tracker field present
-        yes
-        go to tracker
-        no
-        attempts to connect to DHT using info_hash
-public synchronized addPeer(socket, peer_id, reserved) : for when a peer connects and gives you all this info :called by, at thisp point the peer
-        p = new Peer(socket, peer_id, reserved, ExtensionsManager [])
-        peers.add(p)
-        p.start()
-public synchronized removePeer() : who calls this
-
-public synchronized getPeerList(): who calls this
-        x
-private stuff only peer threads call
-        read from file
-        write to file
-private synchronized processMessage(peer, PeerMessage): called by peers when they get a classic message (not extension), processing logic
-        use settings for torrent to infer what we are doing at present
-        willing to upload
-        trying to download
-        at what limits?
-        idling
-        etc
-private createExtensionHandshakeDictionary() :is called each time a new handshake is made, and any time extensions are removed, to possibly reflect most recent state of affairs for all extensions, and that they may be disabled at any time
-        create messageReceived dictionary
-        for all i=1:Extension.length
-        messageReceived.add (i, Extension[i].getExtentionName())
-        create flat keys
-        for all i=1:Extension.length
-        add( Extension[i].getFlatKeys(this))
-private synchronized peerDisconnected(peer)
-        remove from peer list ( do we remove a peer which disconnected?)
-        if number of connected peers < minimumNumberOfConnections:
-        findPeers()
-*/
-
-/*
-        TorrentSwarm()
-
-        if peer supports BEP10, send handshake with torrent.createExtensionHandshakeDictionary()
-
-        while(1) :
-        classic message
-        torrent.processMessage(this, msg)
-        BEP10
-        handshake (note: this may be refreshed)
-        update reverse lookup table
-        extended messages
-        extract extended message ID x
-        map x to local Extension i
-        call torrent.Extension[i].processMessage(this,ByteBuffer)
-        on disconnect exception
-        isConnected = false
-        call torrent.peerDisConnected(this)
-        WHAT DOES THREAD DO, SLEEP ?
-private methods for extensions to call
-private sendExtendedMessage(ByteBuffer/ExtendedMessage) : allows extensions to send messages to peer
-        socket.send(buffer): on disconnect do as in TorrentSwarm() and return false to Extension!! (extension can use to put peer in ban list or something)
-private closeConnection()
-        something?
-private disableExtension() : called to disable itself, perhaps if it is not longer needed
-private enableExtension() called to enable itself, however, how will this ever be called?
-*/

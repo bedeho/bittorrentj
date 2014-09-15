@@ -1,12 +1,9 @@
-package org.bittorrentj.message.exceptions;
+package org.bittorrentj.exceptions;
 
 /**
- * Created by bedeho on 07.09.2014.
- *
- * Exception thrown when in Have constructor raw buffer constructor if piece index
- * in buffer is negative or to large.
+ * Created by bedeho on 15.09.2014.
  */
-public class InvalidPieceIndexInHaveMessage extends MessageCreationException {
+public class InvalidPieceIndexInHaveMessage extends Exception {
 
     /**
      * The invalid piece index

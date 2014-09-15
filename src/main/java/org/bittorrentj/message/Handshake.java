@@ -38,7 +38,7 @@ public class Handshake extends Message {
 
     /**
      * Constructor based on field objects. It is possible to pass null values for some or all fields,
-     * but writeRawMessage() will then return exception.
+     * but writeRawMessage() will then return exceptions.
      * @param pstrlen
      * @param pstr
      * @param reserved

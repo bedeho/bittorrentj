@@ -8,7 +8,7 @@ import java.io.IOException;
 public class ClientIOFailedEvent extends Event {
 
     /**
-     * Input/Output exception in question.
+     * Input/Output exceptions in question.
      */
     private IOException e;
 

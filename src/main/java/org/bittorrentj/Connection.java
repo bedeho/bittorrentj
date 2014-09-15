@@ -182,7 +182,7 @@ public class Connection {
 
                 /**
                 * Check if peer is attempting to send a message we can never process,
-                * that is a message greater than read buffer. If so we throw an exception.
+                * that is a message greater than read buffer. If so we throw an exceptions.
                 */
                 if (totalMessageSize > NETWORK_READ_BUFFER_SIZE)
                     throw new MessageToLargeForNetworkBufferException(totalMessageSize, NETWORK_READ_BUFFER_SIZE);
@@ -274,7 +274,7 @@ public class Connection {
                     // Get message
                     MessageWithLengthField m = writeMessagesQueue.poll();
 
-                    // Is there space in buffer? otherwise throw exception
+                    // Is there space in buffer? otherwise throw exceptions
                     int messageLength = m.getRawMessageLength();
                     if(messageLength > NETWORK_WRITE_BUFFER_SIZE)
                         throw new MessageToLargeForNetworkBufferException(messageLength, NETWORK_WRITE_BUFFER_SIZE);

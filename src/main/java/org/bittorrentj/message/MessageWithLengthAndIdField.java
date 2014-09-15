@@ -50,7 +50,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
         byte rawId = src.get();
         MessageId readId = MessageId.getMessageIdFromRaw(rawId);
 
-        // Throw exception if it does not match id provided to constructor
+        // Throw exceptions if it does not match id provided to constructor
         if(!id.equals(readId))
             throw new NonMatchingIdFieldException(readId, id);
     }
@@ -102,7 +102,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
         byte rawId = src.get(src.position() + LENGTH_FIELD_SIZE);
 
         // Convert to MessageId to extract message, may
-        // case exception if not recognized
+        // case exceptions if not recognized
         MessageId id = MessageId.getMessageIdFromRaw(rawId);
 
         // Call upon correct constructor
@@ -133,7 +133,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
                 byte eRawId = src.get(src.position() + LENGTH_FIELD_SIZE + Extended.EXTENDED_ID_FIELD_SIZE);
 
                 // Process the extended handshake message directly,
-                // otherwise raise exception so caller can process message.
+                // otherwise raise exceptions so caller can process message.
                 if(eRawId == 0)
                     return new ExtendedHandshake(src);
                 else if(activeExtensions.containsKey((int)eRawId)) // we support this extension
@@ -143,7 +143,7 @@ public abstract class MessageWithLengthAndIdField extends MessageWithLengthField
 
             default:
                 // We cannot come here so long as all enum cases are covered, since
-                // getMessageIdFromRaw() throws this exception if
+                // getMessageIdFromRaw() throws this exceptions if
                 // the id is not among the known cases.
                 throw new UnrecognizedMessageIdException(rawId);
         }

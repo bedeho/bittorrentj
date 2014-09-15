@@ -83,4 +83,11 @@ public class MetaInfo {
 
     }
 
+    /**
+     * Number of pieces in the torrent file for this meta information.
+     * @return number of pieces
+     */
+    public int getNumberOfPiecesInTorrent() {
+        return info.getPieces().size();
+    }
 }

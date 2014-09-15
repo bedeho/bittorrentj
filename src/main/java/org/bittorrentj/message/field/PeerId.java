@@ -19,7 +19,7 @@ public enum PeerId {
 
     /**
      * UNKNOWN is included since there are so many peer id formats and peers that
-     * we will likely never support them all, hence an exception makes semantically
+     * we will likely never support them all, hence an exceptions makes semantically
      * little sence, given that the id is likely valid.
      */
 
