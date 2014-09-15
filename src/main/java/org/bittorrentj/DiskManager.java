@@ -15,6 +15,8 @@ public class DiskManager extends Thread {
 
     }
 
+    // MappedByteBuffer <-- memory mapped
+
     private HashMap<Integer, Piece> piecePool;
 
     public DiskManager(Info info) {

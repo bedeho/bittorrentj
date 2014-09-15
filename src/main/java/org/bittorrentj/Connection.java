@@ -3,8 +3,7 @@ package org.bittorrentj;
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.extension.Extension;
-import org.bittorrentj.message.Message;
-import org.bittorrentj.message.MessageWithLengthField;
+import org.bittorrentj.message.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -19,56 +18,17 @@ import java.util.Date;
 public class Connection {
 
     /**
-     * State of client side of connection
+     * State of client side of connection.
+     * Ideally, this state should be the same for all connections,
+     * but there may be cases where more flexibility is needed.
      */
     private PeerState clientState;
 
     /**
+
      * State of peer side of connection
      */
     private PeerState peerState;
-
-    /**
-     * Class capturing state of connection
-     */
-    private class PeerState {
-
-        /**
-         * Is in choking state
-         */
-        private boolean choking;
-
-        /**
-         * Is in choking interested
-         */
-        private boolean interested;
-
-        /**
-         * Constructor
-         * @param choking
-         * @param interested
-         */
-        PeerState(boolean choking, boolean interested) {
-            this.choking = choking;
-            this.interested = interested;
-        }
-
-        public boolean isChoking() {
-            return choking;
-        }
-
-        public void setChoking(boolean choking) {
-            this.choking = choking;
-        }
-
-        public boolean isInterested() {
-            return interested;
-        }
-
-        public void setInterested(boolean interested) {
-            this.interested = interested;
-        }
-    }
 
     /**
      * Date and time when data was written to channel for this connection
@@ -123,12 +83,12 @@ public class Connection {
     /**
      * Queue of messages which have been read but not processed
      */
-    private LinkedList<Message> readMessagesQueue;
+    private LinkedList<MessageWithLengthField> readMessagesQueue;
 
     /**
      * Queue of messages which have been read but not processed
      */
-    private LinkedList<Message> writeMessagesQueue;
+    private LinkedList<MessageWithLengthField> writeMessagesQueue;
 
     /**
      * Maps extension id to corresponding handler so that
@@ -136,24 +96,30 @@ public class Connection {
      */
     private HashMap<Integer, Extension> activeExtensions;
 
-    // MappedByteBuffer <-- memory mapped
-
     /**
      * Constructor
      */
-    public Connection(HashMap<Integer, Extension> activeExtensions) {
+    public Connection(Handshake m, HashMap<Integer, Extension> activeExtensions, boolean [] clientPieceAvailability) {
 
         this.activeExtensions = activeExtensions;
 
-        this.clientState = new PeerState(false, false);
-        this.peerState = new PeerState(false, false);
+        this.clientState = new PeerState(false, false, null);
+        this.peerState = new PeerState(false, false, clientPieceAvailability);
         this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
-        this.readMessagesQueue = new LinkedList<Message>();
+        this.readMessagesQueue = new LinkedList<MessageWithLengthField>();
+        this.writeMessagesQueue = new LinkedList<MessageWithLengthField>();
 
         this.bytesInWriteBuffer = 0;
         this.startPositionOfDataInReadBuffer = 0;
         this.copyAtEdgeEvent = 0;
+
+        /**
+         * If we have knowledge about piece availability, e.g. because
+         * are are resuming a download, then send a bitfield message.
+         */
+        if(clientPieceAvailability != null)
+            writeMessagesQueue.add(new BitField(clientPieceAvailability));
     }
 
     /**
@@ -288,7 +254,7 @@ public class Connection {
                 if(!writeMessagesQueue.isEmpty()) {
 
                     // Get message
-                    Message m = writeMessagesQueue.poll();
+                    MessageWithLengthField m = writeMessagesQueue.poll();
 
                     // Is there space in buffer? otherwise throw exception
                     int messageLength = m.getRawMessageLength();
@@ -321,11 +287,25 @@ public class Connection {
     }
 
     /**
-     *
-     * @param m
+     * Add a message to the write queue of the connection.
+     * @param m message
+     * @throws IllegalArgumentException if a m == null
      */
-    public void enqueueMessageForSending(Message m) {
-        writeMessagesQueue.add(m);
+    public void enqueueMessageForSending(MessageWithLengthField m) throws IllegalArgumentException {
+
+        if(m == null)
+            throw new IllegalArgumentException();
+        else
+            writeMessagesQueue.add(m);
+    }
+
+    /**
+     * Grabs a message from the front of the read queue of the connection,
+     * or return null if queu empty.
+     * @return message
+     */
+    public MessageWithLengthField getNextReceivedMessage() {
+        return readMessagesQueue.poll();
     }
 
     public Date getTimeLastDataSent() {
@@ -342,5 +322,13 @@ public class Connection {
 
     public void setTimeLastDataReceived(Date timeLastDataReceived) {
         this.timeLastDataReceived = timeLastDataReceived;
+    }
+
+    public PeerState getPeerState() {
+        return peerState;
+    }
+
+    public PeerState getClientState() {
+        return clientState;
     }
 }

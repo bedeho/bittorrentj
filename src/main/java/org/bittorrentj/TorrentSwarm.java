@@ -8,14 +8,18 @@ import java.nio.channels.SocketChannel;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 
+import com.sun.org.apache.xalan.internal.lib.Extensions;
 import org.bittorrentj.event.ClientIOFailedEvent;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
-import org.bittorrentj.message.Handshake;
-import org.bittorrentj.message.KeepAlive;
+import org.bittorrentj.message.*;
+import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
+import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.torrent.Info;
 import org.bittorrentj.torrent.MetaInfo;
 
 /**
@@ -74,6 +78,16 @@ public class TorrentSwarm extends Thread {
     private Hash info_hash;
 
     /**
+     *
+     */
+    private Info metadata;
+
+    /**
+     * Maps the name to the extension for all installed extensions for this swarm.
+     */
+    private HashMap<String, Extensions> supportedExtensions;
+
+    /**
      * Maximum amount of time (ms) before no data from peer
      * results in disconnecting it
      */
@@ -93,19 +107,26 @@ public class TorrentSwarm extends Thread {
 
     // diskworker?
 
-    public TorrentSwarm(Hash info_hash) {
+    // State
 
-        // who gets peers? Client or swarm?
-        // dht must be in client I think????
-        // PEX here?
+    /**
+     * Availability of pieces for this torrent.
+     */
+    private boolean [] globalPieceAvailability;
+
+    public TorrentSwarm(Hash info_hash, Info metadata, HashMap<String, Extensions> supportedExtensions) {
 
         this.info_hash = info_hash;
+        this.metadata = metadata;
+        this.supportedExtensions = supportedExtensions;
 
         try {
             this.selector = Selector.open();
         } catch (IOException e) {
             System.out.println("How can we possibly end up here"); // log later or something
         }
+
+        //this.globalPieceAvailability =
 
                 //Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
     }
@@ -203,6 +224,83 @@ public class TorrentSwarm extends Thread {
             connection.enqueueMessageForSending(new KeepAlive());
 
         // Process new message
+        MessageWithLengthField m;
+        while((m = connection.getNextReceivedMessage()) != null)
+            processMessage(m, connection);
+    }
+
+    /**
+     * Process the advent of the given message on the given connection
+     * @param m message
+     * @param connection connection
+     */
+    private void processMessage(MessageWithLengthField m, Connection connection) {
+
+        /**
+         * Does it have id?, if not, then its just a keep-alive message,
+         * and we do nothing about them here.
+         */
+        if(m instanceof MessageWithLengthAndIdField) {
+
+            MessageId id = ((MessageWithLengthAndIdField) m).getId();
+
+            switch (id) {
+
+                case CHOKE:
+
+                    // Our peer just choked us
+                    connection.getPeerState().setChoking(true);
+
+
+
+                    break;
+                case UNCHOKE:
+
+                    break;
+                case INTERESTED:
+
+                    break;
+                case NOT_INTERESTED:
+
+                    break;
+                case HAVE:
+
+                    break;
+                case BITFIELD:
+
+                    // Update peer state
+                    //connection.getPeerState().
+
+                    break;
+                case REQUEST:
+
+                    break;
+                case PIECE:
+
+                    break;
+                case CANCEL:
+
+                    break;
+                case PORT:
+
+                    break;
+
+                case EXTENDED:
+
+                    Extended extendedMessage = (Extended)m;
+
+                    // If we support this extension, then process it
+                    if(activeExtensions.containsKey(extendedMessage.getExtendedMessageId())
+                        activeExtensions.get(extendedMessage.getExtendedMessageId()).processMessage(m);
+                    else // we don't support this
+                        throw new UnsupportedExtendedMessageFoundException(extendedMessage.getExtendedMessageId());
+
+                    break;
+                default:
+                    //throw new Exception("Coding error: processMessage switch does not cover all messages."); // we should never come here
+            }
+         }
+
     }
 
     /**
@@ -236,6 +334,8 @@ public class TorrentSwarm extends Thread {
         // remove from connections hashmap
         // what to do about various buffer is in connection, and also in diskmanager?
 
+
+        // if we have to few connections now, how do we get more peers?
     }
 
     /**
@@ -292,6 +392,13 @@ public class TorrentSwarm extends Thread {
     private void sendEvent(Event e) {
         client.getB().registerEvent(e);
     }
+
+    /**
+     * Checks whether we have yet learned metadata. It may
+     * require BEP9 extension to learn if we just knew info_hash to begin with.
+     * @return
+     */
+    private boolean metadataIsKnown() { return metadata != null;}
 }
 /*
         do we have peers??? reconnect?
