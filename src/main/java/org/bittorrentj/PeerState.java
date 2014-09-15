@@ -68,8 +68,30 @@ public class PeerState {
         this.interested = interested;
     }
 
+    public void setExtendedHandshake(ExtendedHandshake extendedHandshake) {
+        this.extendedHandshake = extendedHandshake;
+    }
+
+    public ExtendedHandshake getExtendedHandshake() {
+        return extendedHandshake;
+    }
+
+    /**
+     * Returns array representing piece availability.
+     * Altering array will not influence availability
+     * in this object.
+     * @return
+     */
+    public boolean[] getPieceAvailability() {
+        return pieceAvailability.clone();
+    }
+
     public void setPieceAvailability(boolean[] pieceAvailability) {
         this.pieceAvailability = pieceAvailability;
+    }
+
+    public boolean isPieceAvailabilityKnown() {
+        return pieceAvailability != null;
     }
 
     public boolean isPieceAvailable(int index) {
@@ -86,5 +108,13 @@ public class PeerState {
             throw new IllegalStateException();
         else
             pieceAvailability[index] = availability;
+    }
+
+    /**
+     * Checks whether BEP10 extension protocol is used by this peer.
+     * @return
+     */
+    public boolean extensionProtocolIsUsed() {
+        return handshake.getReserved().getExtensionProtocolIsUsed();
     }
 }

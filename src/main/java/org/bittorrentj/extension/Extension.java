@@ -46,4 +46,11 @@ public interface Extension {
      * @return message parsed.
      */
     public Extended parseMessage(ByteBuffer src);
+
+    /**
+     * Is called when (guaranteed only once) an extended handshake message is
+     * received over given connection.
+     * @param c connection
+     */
+    public void init(Connection c);
 }

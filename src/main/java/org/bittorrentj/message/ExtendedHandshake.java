@@ -129,17 +129,18 @@ public class ExtendedHandshake extends Extended {
     }
 
     /**
-     * Get maping of extension id to extension names for all enabled
+     * Get mapping of extension id to extension names for all enabled
      * extensions in message, that is all extensions with a non-zero id.
      * @return hash map from extension ids (int) to names (string)
      * @throws DuplicateExtensionNameInMDictionaryException If an extension name was present more than once in the handshake m dictionary.
      * @throws PayloadDoesNotContainMDictionaryException If the m dictionary was not present in the handshake.
      * @throws MalformedMDictionaryException If the m dictionary did not have the expected structure.
      */
-    public HashMap<Integer, String> getEnabledExtensions() throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+    public HashMap<Integer, String> getEnabledExtensions() { // throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
         // Check that all is well
-        validateMDictionary(payload);
+        // NB: we skip for now, assume we didn't mess it up after constructor check
+        //validateMDictionary(payload);
 
         // Allocate list
         HashMap<Integer, String> map = new HashMap<Integer, String>();

@@ -8,13 +8,12 @@ import java.nio.channels.SocketChannel;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 
-import com.sun.org.apache.xalan.internal.lib.Extensions;
 import org.bittorrentj.event.ClientIOFailedEvent;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
+import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
@@ -85,7 +84,7 @@ public class TorrentSwarm extends Thread {
     /**
      * Maps the name to the extension for all installed extensions for this swarm.
      */
-    private HashMap<String, Extensions> supportedExtensions;
+    private HashMap<Integer, Extension> activeClientExtensions;
 
     /**
      * Maximum amount of time (ms) before no data from peer
@@ -114,11 +113,11 @@ public class TorrentSwarm extends Thread {
      */
     private boolean [] globalPieceAvailability;
 
-    public TorrentSwarm(Hash info_hash, Info metadata, HashMap<String, Extensions> supportedExtensions) {
+    public TorrentSwarm(Hash info_hash, Info metadata, HashMap<Integer, Extension> activeClientExtensions) {
 
         this.info_hash = info_hash;
         this.metadata = metadata;
-        this.supportedExtensions = supportedExtensions;
+        this.activeClientExtensions = activeClientExtensions;
 
         try {
             this.selector = Selector.open();
@@ -225,8 +224,18 @@ public class TorrentSwarm extends Thread {
 
         // Process new message
         MessageWithLengthField m;
-        while((m = connection.getNextReceivedMessage()) != null)
-            processMessage(m, connection);
+        while((m = connection.getNextReceivedMessage()) != null) {
+
+            try {
+                processMessage(m, connection);
+            } catch (UnsupportedExtendedMessageFoundException e) {
+                closeConnection(connection);
+                return;
+                // or just ignore ?
+            }
+        }
+
+        // So we dealt with all those messages, anything else we do...
     }
 
     /**
@@ -234,7 +243,7 @@ public class TorrentSwarm extends Thread {
      * @param m message
      * @param connection connection
      */
-    private void processMessage(MessageWithLengthField m, Connection connection) {
+    private void processMessage(MessageWithLengthField m, Connection connection) throws UnsupportedExtendedMessageFoundException {
 
         /**
          * Does it have id?, if not, then its just a keep-alive message,
@@ -248,22 +257,32 @@ public class TorrentSwarm extends Thread {
 
                 case CHOKE:
 
-                    // Our peer just choked us
+                    // Peer just choked us
                     connection.getPeerState().setChoking(true);
-
-
 
                     break;
                 case UNCHOKE:
 
+                    // Peer just unchoked us
+                    connection.getPeerState().setChoking(false);
+
                     break;
                 case INTERESTED:
+
+                    // Peer is interested in getting piece from us
+                    connection.getPeerState().setInterested(true);
 
                     break;
                 case NOT_INTERESTED:
 
+                    // Peer is not interested in getting piece from us
+                    connection.getPeerState().setInterested(false);
+
                     break;
                 case HAVE:
+
+                    // Peer has a new piece
+                    connection.getPeerState().setInterested(true);
 
                     break;
                 case BITFIELD:
@@ -274,14 +293,23 @@ public class TorrentSwarm extends Thread {
                     break;
                 case REQUEST:
 
+                    // send them a piece?
+
                     break;
                 case PIECE:
+
+                    // send out have?
 
                     break;
                 case CANCEL:
 
+                    // dont upload to peer or something?
+
                     break;
                 case PORT:
+
+                    // this is for dht client
+                    System.out.print("later");
 
                     break;
 
@@ -289,11 +317,37 @@ public class TorrentSwarm extends Thread {
 
                     Extended extendedMessage = (Extended)m;
 
-                    // If we support this extension, then process it
-                    if(activeExtensions.containsKey(extendedMessage.getExtendedMessageId())
-                        activeExtensions.get(extendedMessage.getExtendedMessageId()).processMessage(m);
+                    // If this is this is extended handshake, then register it
+                    if(extendedMessage instanceof ExtendedHandshake){
+
+                        ExtendedHandshake extendedHandshake = (ExtendedHandshake)m;
+
+                        // Is this first extended handshake?
+                        boolean isThisFirstExtendedHandshake = connection.getPeerState().getExtendedHandshake() == null;
+
+                        // if so, then for each extension registered in message, that we support, initialize extension
+                        if(isThisFirstExtendedHandshake) {
+
+                            HashMap<Integer, String> enabledExtensions = extendedHandshake.getEnabledExtensions();
+                            for (int extensionId : enabledExtensions.keySet()) {
+
+                                // Get name of extension
+                                String name = enabledExtensions.get(extensionId);
+
+                                // If we have this extension enabled, then call initialization routine
+                                if (activeClientExtensions.containsKey(name))
+                                    activeClientExtensions.get(name).init(connection);
+
+                            }
+                        }
+
+                        // Save (new) handshake in peer state
+                        connection.getPeerState().setExtendedHandshake(extendedHandshake);
+
+                    } else if(activeClientExtensions.containsKey(extendedMessage.getExtendedMessageId())) // If we support this extension, then process it
+                        activeClientExtensions.get(extendedMessage.getExtendedMessageId()).processMessage(connection, extendedMessage);
                     else // we don't support this
-                        throw new UnsupportedExtendedMessageFoundException(extendedMessage.getExtendedMessageId());
+                        throw new UnsupportedExtendedMessageFoundException((byte)extendedMessage.getExtendedMessageId());
 
                     break;
                 default:
@@ -360,6 +414,10 @@ public class TorrentSwarm extends Thread {
     synchronized public void addConnection(SocketChannel channel, Handshake m) {
 
         //register channel with selector with both opread and opwrite
+
+        // new connection (PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions)
+
+        // new peer state (Handshake m, HashMap<Integer, Extension> activeExtensions, boolean [] clientPieceAvailability
     }
 
     /**

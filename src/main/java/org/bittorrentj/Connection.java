@@ -1,9 +1,17 @@
 package org.bittorrentj;
 
+import org.bittorrentj.bencodej.Bencodable;
+import org.bittorrentj.bencodej.BencodableByteString;
+import org.bittorrentj.bencodej.BencodableInteger;
+import org.bittorrentj.bencodej.BencodeableDictionary;
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
+import org.bittorrentj.message.exceptions.DuplicateExtensionNameInMDictionaryException;
+import org.bittorrentj.message.exceptions.MalformedMDictionaryException;
+import org.bittorrentj.message.exceptions.PayloadDoesNotContainMDictionaryException;
+import org.bittorrentj.message.field.PeerId;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,7 +33,6 @@ public class Connection {
     private PeerState clientState;
 
     /**
-
      * State of peer side of connection
      */
     private PeerState peerState;
@@ -91,20 +98,19 @@ public class Connection {
     private LinkedList<MessageWithLengthField> writeMessagesQueue;
 
     /**
-     * Maps extension id to corresponding handler so that
-     * messages
+     * Mapping from id to extension for all active BEP10 extensions
+     * installed on client.
      */
-    private HashMap<Integer, Extension> activeExtensions;
+    private HashMap<Integer, Extension> activeClientExtensions;
 
     /**
      * Constructor
      */
-    public Connection(Handshake m, HashMap<Integer, Extension> activeExtensions, boolean [] clientPieceAvailability) {
+    public Connection(PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
-        this.activeExtensions = activeExtensions;
+        this.clientState = clientState;
+        this.peerState = peerState;
 
-        this.clientState = new PeerState(false, false, null);
-        this.peerState = new PeerState(false, false, clientPieceAvailability);
         this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
         this.readMessagesQueue = new LinkedList<MessageWithLengthField>();
@@ -118,8 +124,20 @@ public class Connection {
          * If we have knowledge about piece availability, e.g. because
          * are are resuming a download, then send a bitfield message.
          */
-        if(clientPieceAvailability != null)
-            writeMessagesQueue.add(new BitField(clientPieceAvailability));
+        if(clientState.isPieceAvailabilityKnown())
+            enqueueMessageForSending(new BitField(clientState.getPieceAvailability()));
+
+        /**
+         * If both client and peer support BEP10, then we also send extended handshake.
+         */
+        if(clientState.extensionProtocolIsUsed() && peerState.extensionProtocolIsUsed()) {
+
+            // Generate message
+            ExtendedHandshake m = buildExtendedHandshake();
+
+            // Queue up message for sending
+            enqueueMessageForSending(m);
+        }
     }
 
     /**
@@ -190,7 +208,7 @@ public class Connection {
                     MessageWithLengthField m;
 
                     try {
-                        m = MessageWithLengthField.create(temporaryBuffer, activeExtensions);
+                        m = MessageWithLengthField.create(temporaryBuffer, activeClientExtensions);
                     } catch (Exception e){
                         throw new InvalidMessageReceivedException(e);
                     }
@@ -245,7 +263,7 @@ public class Connection {
         do {
 
             // Does buffer have anything to be written
-            if(bytesInWriteBuffer == 0) { // <--------------- this does not work!!!!
+            if(bytesInWriteBuffer == 0) {
 
                 // Clear buffer: pos = 0, lim = cap, mark discarded
                 networkWriteBuffer.clear();
@@ -295,13 +313,51 @@ public class Connection {
 
         if(m == null)
             throw new IllegalArgumentException();
-        else
+        else {
             writeMessagesQueue.add(m);
+
+            /**
+             * If we just sent an new extended handshake, then
+             * update our peer state.
+             */
+            if(m instanceof ExtendedHandshake)
+                clientState.setExtendedHandshake((ExtendedHandshake)m);
+        }
+    }
+
+    /**
+     * Builds an extended handshake message for the client
+     * @return
+     */
+    ExtendedHandshake buildExtendedHandshake() throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+
+        // Iterate extensions
+        BencodeableDictionary handshakePayload = new BencodeableDictionary();
+        BencodeableDictionary m = new BencodeableDictionary();
+
+        for(int id: activeClientExtensions.keySet()) {
+
+            // Get the extension object
+            Extension e = activeClientExtensions.get(id);
+
+            // Add key
+            m.put(new BencodableByteString(""+id), new BencodableByteString(e.getName()));
+
+            // Add extension specific keys to handshake payload
+            // NB: duplicate keys will be replaced!!!
+            handshakePayload.putAll(e.keysToAddToExtendedHandshake());
+        }
+
+        // Add m dictionary to payload
+        handshakePayload.put(new BencodableByteString("m"), m);
+
+        // Create message and return
+        return new ExtendedHandshake(handshakePayload);
     }
 
     /**
      * Grabs a message from the front of the read queue of the connection,
-     * or return null if queu empty.
+     * or return null if queue empty.
      * @return message
      */
     public MessageWithLengthField getNextReceivedMessage() {
