@@ -15,13 +15,26 @@ import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
-import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.torrent.MetaInfo;
 
 /**
  * Created by bedeho on 30.08.2014.
  */
 public class TorrentSwarm extends Thread {
+
+
+    /**
+     * Control state given by client of this swarm.
+     * ON corresponds to an effort to download the torrent,
+     * or alternatively seed if it is fully downloaded.
+     * OFF corresponds to rejecting all seed requests.
+     */
+
+    public enum TorrentSwarmState {
+        ON,OFF;
+    }
+
+    private TorrentSwarmState swarmState;
 
     /**
      * Multiplexing selector for swarm connectivity
@@ -86,14 +99,7 @@ public class TorrentSwarm extends Thread {
      */
     private final static int KEEP_ALIVE_INTERVAL = 60*1000;
 
-    /**
-     * Received bit field message. Starts out as null, and
-     * is evenutally set when messaga arrives. If the metadata
-     * is known when the message arrives, then piece availability
-     * of the peer can be set, otherwise this availability must
-     * be set by the BEP9 extension which also sets the metadata.
-     */
-    private BitField receivedBitField;
+
 
     // diskworker?
 
@@ -104,12 +110,12 @@ public class TorrentSwarm extends Thread {
      */
     private boolean [] globalPieceAvailability;
 
-    public TorrentSwarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions) {
+    public TorrentSwarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions, TorrentSwarmState swarmState) {
 
         this.infoHash = infoHash;
         this.metaInformation = metaInformation;
         this.activeClientExtensions = activeClientExtensions;
-        this.receivedBitField = null;
+        this.swarmState = swarmState;
 
         try {
             this.selector = Selector.open();
@@ -159,9 +165,11 @@ public class TorrentSwarm extends Thread {
              *
              */
 
+            // stop downloading pieces from someone who is just super slow,or who did not respond to our request?
+
             // if we have to few connections now, how do we get more peers?
 
-
+            // choking algorithm, and optimistic unchoking
 
 
         }
@@ -199,27 +207,24 @@ public class TorrentSwarm extends Thread {
                     // Read from channel
                     connection.readMessagesFromChannel();
 
-                    // Process new message
-                    MessageWithLengthField m;
-                    while((m = connection.getNextReceivedMessage()) != null) {
-
-                        try {
-                            processMessage(m, connection);
-                        } catch (UnsupportedExtendedMessageFoundException e) {
-                            closeConnection(connection);
-                            //return;
-                            // or just ignore ?
-                        } catch (ReceivedBitFieldMoreThanOnce e) {
-                            closeConnection(connection);
-                            //return;
-                            // or just ignore ?
-                        } catch (InvalidPieceIndexInHaveMessage e) {
-                            closeConnection(connection);    
-                            //return;
-                            // or just ignore ?
-                        } catch (InvalidBitFieldMessage e) {
-
-                        }
+                    try {
+                        connection.processReadMessageQueue();
+                    } catch (UnsupportedExtendedMessageFoundException e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    } catch (ReceivedBitFieldMoreThanOnce e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    } catch (InvalidPieceIndexInHaveMessage e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    } catch (InvalidBitFieldMessage e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
                     }
                 }
 
@@ -243,182 +248,6 @@ public class TorrentSwarm extends Thread {
             }
         }
     }
-
-    /**
-     * Process the advent of the given message on the given connection
-     * @param m message
-     * @param connection connection
-     */
-    private void processMessage(MessageWithLengthField m, Connection connection) throws
-            UnsupportedExtendedMessageFoundException,
-            ReceivedBitFieldMoreThanOnce,
-            InvalidPieceIndexInHaveMessage,
-            InvalidBitFieldMessage {
-
-        // should we move this method into connection class perhaps? since it is on a per connection basis, and then pass in suplementary info like metainfo etc.??
-        // write out, then see.
-
-
-
-
-        /**
-         * Does it have id?, if not, then its just a keep-alive message,
-         * and we do nothing about them here.
-         */
-        if(m instanceof MessageWithLengthAndIdField) {
-
-            MessageId id = ((MessageWithLengthAndIdField) m).getId();
-
-            switch (id) {
-
-                case CHOKE:
-
-                    // Peer just choked us
-                    connection.getPeerState().setChoking(true);
-
-                    break;
-                case UNCHOKE:
-
-                    // Peer just unchoked us
-                    connection.getPeerState().setChoking(false);
-
-                    break;
-                case INTERESTED:
-
-                    // Peer is interested in getting piece from us
-                    connection.getPeerState().setInterested(true);
-
-                    break;
-                case NOT_INTERESTED:
-
-                    // Peer is not interested in getting piece from us
-                    connection.getPeerState().setInterested(false);
-
-                    break;
-                case HAVE:
-
-                    // Peer has a new piece
-
-                    // Do we have metainfo yet
-                    if(isMetaInformationKnown()) {
-
-                        Have haveMessage = (Have)m;
-
-                        // Check that have message is indeed valid
-                        int numberOfPiecesInTorrent = metaInformation.getNumberOfPiecesInTorrent();
-                        if(haveMessage.validate(numberOfPiecesInTorrent))
-                            connection.getPeerState().isPieceAvailable(haveMessage.getPieceIndex()); // and alter availability based on it
-                        else
-                            throw new InvalidPieceIndexInHaveMessage(haveMessage.getPieceIndex(), numberOfPiecesInTorrent); // or throw exceptions if invalid
-                    }
-
-                    break;
-                case BITFIELD:
-
-                    // Peer announces what pieces it has
-
-                    // If we have already received this message, we raise an exception, since it should only be sent once.
-                    if(receivedBitField != null)
-                        throw new ReceivedBitFieldMoreThanOnce();
-                    else {
-
-                        // otherwise save it the first time
-                        receivedBitField = (BitField)m;
-
-                        // If meta information is known, then update piece availability
-                        if(isMetaInformationKnown()) {
-
-                            int numberOfPieces = metaInformation.getNumberOfPiecesInTorrent();
-
-                            // Check that message is valid, given the number of pieces in torrent
-                            if(!receivedBitField.validateBitField(numberOfPieces))
-                                throw new InvalidBitFieldMessage(receivedBitField);
-                            else // and then alter peer piece availability based
-                                connection.getPeerState().setPieceAvailability(receivedBitField.getBooleanBitField(numberOfPieces));
-                        }
-                    }
-
-                    break;
-                case REQUEST:
-
-                    // send them a piece?
-
-                    break;
-                case PIECE:
-
-                    // send out have?
-
-                    break;
-                case CANCEL:
-
-                    // dont upload to peer or something?
-
-                    break;
-                case PORT:
-
-                    // this is for dht client
-                    System.out.print("later");
-
-                    break;
-
-                case EXTENDED:
-
-                    Extended extendedMessage = (Extended)m;
-
-                    // If this is this is extended handshake, then register it
-                    if(extendedMessage instanceof ExtendedHandshake){
-
-                        ExtendedHandshake extendedHandshake = (ExtendedHandshake)m;
-
-                        // Is this first extended handshake?
-                        boolean isThisFirstExtendedHandshake = connection.getPeerState().getExtendedHandshake() == null;
-
-                        // if so, then for each extension registered in message, that we support, initialize extension
-                        if(isThisFirstExtendedHandshake) {
-
-                            HashMap<Integer, String> enabledExtensions = extendedHandshake.getEnabledExtensions();
-                            for (int extensionId : enabledExtensions.keySet()) {
-
-                                // Get name of extension
-                                String name = enabledExtensions.get(extensionId);
-
-                                // If we have this extension enabled, then call initialization routine
-                                if (activeClientExtensions.containsKey(name))
-                                    activeClientExtensions.get(name).init(connection);
-                            }
-                        }
-
-                        // Save (new) handshake in peer state
-                        connection.getPeerState().setExtendedHandshake(extendedHandshake);
-
-                    } else if(activeClientExtensions.containsKey(extendedMessage.getExtendedMessageId())) // If we support this extension, then process it
-                        activeClientExtensions.get(extendedMessage.getExtendedMessageId()).processMessage(connection, extendedMessage);
-                    else // we don't support this
-                        throw new UnsupportedExtendedMessageFoundException((byte)extendedMessage.getExtendedMessageId());
-
-                    break;
-                default:
-                    //throw new Exception("Coding error: processMessage switch does not cover all messages."); // we should never come here
-            }
-         }
-
-    }
-
-    /**
-     * after creating a message:
-     * ------------------------
-     * if its a bitfield, check that it matches the number of pieces,if we know that number
-     * throw new InvalidMessageLengthFieldException(bitfield.length, numberOfPiecesInTorrent);
-     *
-     * if its a piece, check that: Check that it is non-negative and also not to large
-     if throw new InvalidPieceIndexInHaveMessage(this.pieceIndex, numberOfPiecesInTorrent);
-     *
-     *
-     *
-     *
-     * if its and extended message, then call upon the correct handler, and it needs to check
-     * that the length field was correct.
-     */
 
     /**
      *
@@ -510,5 +339,21 @@ public class TorrentSwarm extends Thread {
      * require BEP9 extension to learn if we just knew info_hash to begin with.
      * @return
      */
-    private boolean isMetaInformationKnown() { return metaInformation != null;}
+    public boolean isMetaInformationKnown() { return metaInformation != null;}
+
+    public MetaInfo getMetaInformation() {
+        return metaInformation;
+    }
+
+    public TorrentSwarmState getSwarmState() {
+        return swarmState;
+    }
+
+    public void setSwarmState(TorrentSwarmState swarmState) {
+
+        // do lots of other stuff?
+
+
+        this.swarmState = swarmState;
+    }
 }

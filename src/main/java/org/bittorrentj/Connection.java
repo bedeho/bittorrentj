@@ -4,13 +4,14 @@ import org.bittorrentj.bencodej.Bencodable;
 import org.bittorrentj.bencodej.BencodableByteString;
 import org.bittorrentj.bencodej.BencodableInteger;
 import org.bittorrentj.bencodej.BencodeableDictionary;
-import org.bittorrentj.exceptions.InvalidMessageReceivedException;
-import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
+import org.bittorrentj.exceptions.*;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.DuplicateExtensionNameInMDictionaryException;
 import org.bittorrentj.message.exceptions.MalformedMDictionaryException;
 import org.bittorrentj.message.exceptions.PayloadDoesNotContainMDictionaryException;
+import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
+import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.field.PeerId;
 
 import java.io.IOException;
@@ -24,6 +25,11 @@ import java.util.Date;
  * Created by bedeho on 30.08.2014.
  */
 public class Connection {
+
+    /**
+     * TorrentSwarm to which this connection belongs.
+     */
+    private TorrentSwarm swarm;
 
     /**
      * State of client side of connection.
@@ -104,12 +110,26 @@ public class Connection {
     private HashMap<Integer, Extension> activeClientExtensions;
 
     /**
+     * Received bit field message. Starts out as null, and
+     * is evenutally set when messaga arrives. If the metadata
+     * is known when the message arrives, then piece availability
+     * of the peer can be set, otherwise this availability must
+     * be set by the BEP9 extension which also sets the metadata.
+     */
+    private BitField receivedBitField;
+
+    /**
      * Constructor
      */
-    public Connection(PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+    public Connection(TorrentSwarm swarm, PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
+        this.swarm = swarm;
         this.clientState = clientState;
         this.peerState = peerState;
+
+        this.activeClientExtensions = activeClientExtensions;
+
+        this.receivedBitField = null;
 
         this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
@@ -303,6 +323,182 @@ public class Connection {
         } while(numberOfBytesWritten > 0); // We are done for now if we can't write to socket right now
 
     }
+
+    public void processReadMessageQueue() throws InvalidBitFieldMessage, ReceivedBitFieldMoreThanOnce, InvalidPieceIndexInHaveMessage, UnsupportedExtendedMessageFoundException {
+
+        // Process new message
+        MessageWithLengthField m;
+        while((m = getNextReceivedMessage()) != null)
+            processMessage(m);
+    }
+
+    /**
+     * Process the advent of the given message on the given connection
+     * @param m message
+     */
+    private void processMessage(MessageWithLengthField m) throws
+            UnsupportedExtendedMessageFoundException,
+            ReceivedBitFieldMoreThanOnce,
+            InvalidPieceIndexInHaveMessage,
+            InvalidBitFieldMessage {
+
+        /**
+         * Does it have id?, if not, then its just a keep-alive message,
+         * and we do nothing about them here.
+         */
+        if(m instanceof MessageWithLengthAndIdField) {
+
+            MessageId id = ((MessageWithLengthAndIdField) m).getId();
+
+            switch (id) {
+
+                case CHOKE:
+
+                    // Peer just choked us
+                    peerState.setChoking(true);
+
+                    break;
+                case UNCHOKE:
+
+                    // Peer just unchoked us
+                    peerState.setChoking(false);
+
+                    break;
+                case INTERESTED:
+
+                    // Peer is interested in getting piece from us
+                    peerState.setInterested(true);
+
+                    break;
+                case NOT_INTERESTED:
+
+                    // Peer is not interested in getting piece from us
+                    peerState.setInterested(false);
+
+                    break;
+                case HAVE:
+
+                    // Peer has a new piece
+
+                    // Do we have metainfo yet
+                    if(swarm.isMetaInformationKnown()) {
+
+                        Have haveMessage = (Have)m;
+
+                        // Check that have message is indeed valid
+                        int numberOfPiecesInTorrent = swarm.getMetaInformation().getNumberOfPiecesInTorrent();
+                        if(haveMessage.validate(numberOfPiecesInTorrent)) {
+                            peerState.alterPieceAvailability(haveMessage.getPieceIndex(), true); // and alter availability based on it
+
+                            // If we are downloading, and this was piece we need, then alter interestedness.
+
+
+
+                        } else
+                            throw new InvalidPieceIndexInHaveMessage(haveMessage.getPieceIndex(), numberOfPiecesInTorrent); // or throw exceptions if invalid
+                    }
+
+                    break;
+                case BITFIELD:
+
+                    // Peer announces what pieces it has
+
+                    // If we have already received this message, we raise an exception, since it should only be sent once.
+                    if(receivedBitField != null)
+                        throw new ReceivedBitFieldMoreThanOnce();
+                    else {
+
+                        // otherwise save it the first time
+                        receivedBitField = (BitField)m;
+
+                        // If meta information is known, then update piece availability
+                        if(swarm.isMetaInformationKnown()) {
+
+                            int numberOfPieces = swarm.getMetaInformation().getNumberOfPiecesInTorrent();
+
+                            // Check that message is valid, given the number of pieces in torrent
+                            if(!receivedBitField.validateBitField(numberOfPieces))
+                                throw new InvalidBitFieldMessage(receivedBitField);
+                            else { // and then alter peer piece availability based
+                                peerState.setPieceAvailability(receivedBitField.getBooleanBitField(numberOfPieces));
+
+                                // If we are downloading, and this was piece we need, then alter interestedness.
+
+                            }
+                        }
+                    }
+
+                    break;
+                case REQUEST:
+
+                    // We ignore the request unless we are in the ON state
+                    if(swarm.getSwarmState() == TorrentSwarm.TorrentSwarmState.OFF)
+                        return;
+
+
+
+                    break;
+                case PIECE:
+
+                    // send out have?
+
+                    break;
+                case CANCEL:
+
+                    // dont upload to peer or something?
+
+                    break;
+                case PORT:
+
+                    // this is for dht client
+                    System.out.print("later");
+
+                    break;
+
+                case EXTENDED:
+
+                    Extended extendedMessage = (Extended)m;
+
+                    // If this is this is extended handshake, then register it
+                    if(extendedMessage instanceof ExtendedHandshake){
+
+                        ExtendedHandshake extendedHandshake = (ExtendedHandshake)m;
+
+                        // Is this first extended handshake?
+                        boolean isThisFirstExtendedHandshake = peerState.getExtendedHandshake() == null;
+
+                        // if so, then for each extension registered in message, that we support, initialize extension
+                        if(isThisFirstExtendedHandshake) {
+
+                            HashMap<Integer, String> enabledExtensions = extendedHandshake.getEnabledExtensions();
+                            for (int extensionId : enabledExtensions.keySet()) {
+
+                                // Get name of extension
+                                String name = enabledExtensions.get(extensionId);
+
+                                // If we have this extension enabled, then call initialization routine
+                                if (activeClientExtensions.containsKey(name))
+                                    activeClientExtensions.get(name).init(this);
+                            }
+                        }
+
+                        // Save (new) handshake in peer state
+                        peerState.setExtendedHandshake(extendedHandshake);
+
+                    } else if(activeClientExtensions.containsKey(extendedMessage.getExtendedMessageId())) // If we support this extension, then process it
+                        activeClientExtensions.get(extendedMessage.getExtendedMessageId()).processMessage(this, extendedMessage);
+                    else // we don't support this
+                        throw new UnsupportedExtendedMessageFoundException((byte)extendedMessage.getExtendedMessageId());
+
+                    break;
+                default:
+                    //throw new Exception("Coding error: processMessage switch does not cover all messages."); // we should never come here
+            }
+        }
+
+    }
+
+
 
     /**
      * Add a message to the write queue of the connection.
