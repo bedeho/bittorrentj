@@ -3,6 +3,11 @@ bittorrentj
 
 A BitTorrent client library in Java.
 
+Architecture
+--------
+The library is inspired by the libtorrent library of Arvid Nordberg,
+and has some architectural similarities.
+
 Features
 --------
 The following bittorrent enhancement proposals (BEPs) are supported
@@ -18,6 +23,12 @@ The following bittorrent enhancement proposals (BEPs) are supported
 - BEP43: Cryptocurrency Payment Protocol (todo)
 
 Extension API
+--------
+
+Install
+--------
+
+Usage
 --------
 
 Contribute
