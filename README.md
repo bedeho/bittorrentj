@@ -7,15 +7,18 @@ Features
 --------
 The following bittorrent enhancement proposals (BEPs) are supported
 
-- BEP6: Distributed Hash Table
-- BEP9: Metadata Exchange
-- BEP10: Extension Protocol
-- BEP15: UDP Tracker Protocol
-- BEP23: Multitracker Metadata Extension
-- BEP23: Compact Peer List
-- BEP43: Cryptocurrency Payment Protocol
+- BEP3: BitTorrent Protocol Specification
+- BEP5: Distributed Hash Table (todo)
+- BEP6: Fast Extension (todo)
+- BEP9: Metadata Exchange (todo)
+- BEP10: Extension Protocol, with extension API (see below)
+- BEP15: UDP Tracker Protocol (todo)
+- BEP23: Multitracker Metadata Extension (todo)
+- BEP23: Compact Peer List (todo)
+- BEP43: Cryptocurrency Payment Protocol (todo)
 
-There is also an BEP10 extension API.
+Extension API
+--------
 
 Contribute
 ----------
