@@ -98,6 +98,10 @@ public class Request extends MessageWithLengthAndIdField {
         return length;
     }
 
+    public Cancel toCancelMessage() {
+        return new Cancel(index, begin, length);
+    }
+
     @Override
     protected void writePayloadToBuffer(ByteBuffer dst) {
         dst.putInt(index);

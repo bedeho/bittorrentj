@@ -1,4 +1,4 @@
-package org.bittorrentj;
+package org.bittorrentj.swarm;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -8,6 +8,7 @@ import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import org.bittorrentj.Client;
 import org.bittorrentj.event.ClientIOFailedEvent;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.exceptions.*;
@@ -20,7 +21,7 @@ import org.bittorrentj.torrent.MetaInfo;
 /**
  * Created by bedeho on 30.08.2014.
  */
-public class TorrentSwarm extends Thread {
+public class Swarm extends Thread {
 
 
     /**
@@ -110,7 +111,7 @@ public class TorrentSwarm extends Thread {
      */
     private boolean [] globalPieceAvailability;
 
-    public TorrentSwarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions, TorrentSwarmState swarmState) {
+    public Swarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions, TorrentSwarmState swarmState) {
 
         this.infoHash = infoHash;
         this.metaInformation = metaInformation;
@@ -143,11 +144,11 @@ public class TorrentSwarm extends Thread {
              * processOther things??
              *
              *
-             // So we dealt with all those messages, anything else we do...
 
-             // process event where a piece which was finally written to disk!!
-             *
-             */
+
+             // process event where a piece which was finally written to org.bittorrentj.disk!!
+
+
 
 
             /**
@@ -170,6 +171,8 @@ public class TorrentSwarm extends Thread {
             // if we have to few connections now, how do we get more peers?
 
             // choking algorithm, and optimistic unchoking
+
+            // extension processing called as well
 
 
         }

@@ -1,4 +1,4 @@
-package org.bittorrentj;
+package org.bittorrentj.swarm;
 
 /**
  * Created by bedeho on 15.09.2014.
@@ -6,6 +6,9 @@ package org.bittorrentj;
 
 import org.bittorrentj.message.ExtendedHandshake;
 import org.bittorrentj.message.Handshake;
+import org.bittorrentj.message.Request;
+
+import java.util.LinkedList;
 
 /**
  * Class capturing state of connection
@@ -36,6 +39,11 @@ public class PeerState {
      * Most recent extended handshake (BEP10) transmitted by peer.
      */
     private ExtendedHandshake extendedHandshake;
+
+    /**
+     * Request messages sent by this peer which have not been satisfied.
+     */
+    private LinkedList<Request> unsatisfiedRequests;
 
     /**
      * Constructor
@@ -117,4 +125,8 @@ public class PeerState {
     public boolean extensionProtocolIsUsed() {
         return handshake.getReserved().getExtensionProtocolIsUsed();
     }
+
+    public void registerRequest(Request m) { unsatisfiedRequests.add(m);}
+
+    public boolean unregisterRequest(Request m) { return unsatisfiedRequests.remove(m); }
 }

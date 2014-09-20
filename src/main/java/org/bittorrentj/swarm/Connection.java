@@ -1,8 +1,6 @@
-package org.bittorrentj;
+package org.bittorrentj.swarm;
 
-import org.bittorrentj.bencodej.Bencodable;
 import org.bittorrentj.bencodej.BencodableByteString;
-import org.bittorrentj.bencodej.BencodableInteger;
 import org.bittorrentj.bencodej.BencodeableDictionary;
 import org.bittorrentj.exceptions.*;
 import org.bittorrentj.extension.Extension;
@@ -12,7 +10,6 @@ import org.bittorrentj.message.exceptions.MalformedMDictionaryException;
 import org.bittorrentj.message.exceptions.PayloadDoesNotContainMDictionaryException;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.MessageId;
-import org.bittorrentj.message.field.PeerId;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -27,9 +24,9 @@ import java.util.Date;
 public class Connection {
 
     /**
-     * TorrentSwarm to which this connection belongs.
+     * Swarm to which this connection belongs.
      */
-    private TorrentSwarm swarm;
+    private Swarm swarm;
 
     /**
      * State of client side of connection.
@@ -121,7 +118,7 @@ public class Connection {
     /**
      * Constructor
      */
-    public Connection(TorrentSwarm swarm, PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
         this.swarm = swarm;
         this.clientState = clientState;
@@ -431,11 +428,8 @@ public class Connection {
                     break;
                 case REQUEST:
 
-                    // We ignore the request unless we are in the ON state
-                    if(swarm.getSwarmState() == TorrentSwarm.TorrentSwarmState.OFF)
-                        return;
-
-
+                    // Peer requests pieces
+                    peerState.registerRequest((Request) m);
 
                     break;
                 case PIECE:
@@ -446,6 +440,9 @@ public class Connection {
                 case CANCEL:
 
                     // dont upload to peer or something?
+
+                    // Remove the request message corresponding to this cancel message
+                    peerState.unregisterRequest(m.toRequestMessage());
 
                     break;
                 case PORT:

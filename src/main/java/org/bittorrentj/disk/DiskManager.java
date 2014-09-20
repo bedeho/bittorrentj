@@ -1,5 +1,6 @@
-package org.bittorrentj;
+package org.bittorrentj.disk;
 
+import org.bittorrentj.swarm.Connection;
 import org.bittorrentj.torrent.Info;
 import org.bittorrentj.torrent.SingleFileInfo;
 

@@ -15,6 +15,7 @@ import org.bittorrentj.message.Handshake;
 import org.bittorrentj.message.field.Hash;
 import org.bittorrentj.message.field.PeerId;
 import org.bittorrentj.message.field.Reserved;
+import org.bittorrentj.swarm.Swarm;
 
 public class Client extends Thread {
 
@@ -31,7 +32,7 @@ public class Client extends Thread {
     /**
      * Collection of torrentSwarms presently being serviced
      */
-    private HashMap<Hash, TorrentSwarm> torrentSwarms;
+    private HashMap<Hash, Swarm> torrentSwarms;
 
     /**
      * Socket channel used for server
@@ -122,7 +123,7 @@ public class Client extends Thread {
 
         this.b = b;
         this.numberOfHandshakingConnections = 0;
-        this.torrentSwarms = new HashMap<Hash, TorrentSwarm>();
+        this.torrentSwarms = new HashMap<Hash, Swarm>();
     }
 
     /**
@@ -378,7 +379,7 @@ public class Client extends Thread {
                         state.messageReceived.setInfo_hash(new Hash(info_hash));
 
                         // Do we serve this torrent?
-                        TorrentSwarm t = torrentSwarms.get(state.messageReceived.getInfo_hash());
+                        Swarm t = torrentSwarms.get(state.messageReceived.getInfo_hash());
                         if(t != null) {
 
                             // Can this swarm handle one more client
@@ -434,7 +435,7 @@ public class Client extends Thread {
                     // Save peer_id in state
                     state.messageReceived.setPeer_id(new PeerId(peer_id));
 
-                    // Unregister channel with this selector, will be registered in TorrentSwarm object
+                    // Unregister channel with this selector, will be registered in Swarm object
                     key.cancel();
 
                     // Add peer to given torrent
@@ -520,7 +521,7 @@ public class Client extends Thread {
         int number = 0;
 
         // Count the number of peers for each torrent.
-        for(TorrentSwarm t: torrentSwarms.values())
+        for(Swarm t: torrentSwarms.values())
             number += t.getNumberOfPeers();
 
         // Count the connections not yet having completed handshake
@@ -538,7 +539,7 @@ public class Client extends Thread {
     }
 
     /**
-     * Getter routine used by TorrentSwarm objects to send message
+     * Getter routine used by Swarm objects to send message
      * to manager
      * @return manager
      */
