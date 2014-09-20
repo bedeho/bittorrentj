@@ -344,6 +344,8 @@ public class Swarm extends Thread {
      */
     public boolean isMetaInformationKnown() { return metaInformation != null;}
 
+    public int
+
     public MetaInfo getMetaInformation() {
         return metaInformation;
     }

@@ -41,7 +41,8 @@ public class PeerState {
     private ExtendedHandshake extendedHandshake;
 
     /**
-     * Request messages sent by this peer which have not been satisfied.
+     * Request messages sent by this peer which have not been satisfied,
+     * that is a piece message has not been sent in response.
      */
     private LinkedList<Request> unsatisfiedRequests;
 
@@ -55,6 +56,7 @@ public class PeerState {
         this.choking = choking;
         this.interested = interested;
         this.pieceAvailability = pieceAvailability;
+        this.unsatisfiedRequests = new LinkedList<Request>();
 
         this.handshake = handshake;
         this.extendedHandshake = extendedHandshake;

@@ -116,7 +116,7 @@ public class BitTorrentj {
      * Is called by the client thread (ClientThread) for various reasons (see where for exhaustive list)
      * @param e event object
      */
-    void registerEvent(Event e) {
+    public void registerEvent(Event e) {
 
         synchronized (eventQueue) {
 

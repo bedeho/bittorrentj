@@ -98,6 +98,15 @@ public class Cancel extends MessageWithLengthAndIdField {
         return length;
     }
 
+    /**
+     * Returns a request message which is considered based on equals
+     * method of the request class. Is typically used by swarm to recover what
+     * request message it should remove from the unprocessed request queue
+     * of a peer when a this cancel message arrives.
+     * @return request message
+     */
+    public Request toRequestMessage() { return new Request(index, begin, length);}
+
     @Override
     protected void writePayloadToBuffer(ByteBuffer dst) {
         dst.putInt(index);

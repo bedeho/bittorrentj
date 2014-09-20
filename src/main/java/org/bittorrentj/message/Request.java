@@ -98,8 +98,35 @@ public class Request extends MessageWithLengthAndIdField {
         return length;
     }
 
+    /**
+     * Returns a cancel message which cancels
+     * this request.
+     * @return cancel message
+     */
     public Cancel toCancelMessage() {
         return new Cancel(index, begin, length);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Request)) return false;
+
+        Request request = (Request) o;
+
+        if (begin != request.begin) return false;
+        if (index != request.index) return false;
+        if (length != request.length) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = index;
+        result = 31 * result + begin;
+        result = 31 * result + length;
+        return result;
     }
 
     @Override

@@ -74,6 +74,30 @@ public class Connection {
     private int copyAtEdgeEvent; // purely a performance statistic to assess whether circluar buffer is needed
 
     /**
+     * The size of the window used to measure network io (up/down) speed
+     * over, in milliseconds.
+     */
+    private final static int NETWORK_IO_SPEED_MEASUREMENT_WINDOW_SIZE = 1000; // (ms)
+
+    /**
+     * Counts the amount of raw data read into the network read buffer
+     * within present averaging window.
+     */
+    private int rawDownloadCounter;
+
+    /**
+     * Counts the amount of data received in piece messages
+     * which we actually needed, that is raw block content we
+     * did not already have.
+     *
+     * The reason this quantity is required, on top of
+     * the rawDownloadCounter variable, is because
+     * that variable counts everything, including flooding
+     * and pieces we don't need.
+     */
+    private int validPieceDownloadCounter;
+
+    /**
      * Write buffer for network
      */
     private ByteBuffer networkWriteBuffer;
@@ -82,6 +106,12 @@ public class Connection {
      * Size (bytes) of networkWriteBuffer
      */
     private final static int NETWORK_WRITE_BUFFER_SIZE = 10 * 1024 * 1024;
+
+    /**
+     * Counts the amount of raw data written into the network write buffer
+     * within present averaging window.
+     */
+    private int rawUploadCounter;
 
     /**
      * The number of bytes in the write buffer.
@@ -108,7 +138,7 @@ public class Connection {
 
     /**
      * Received bit field message. Starts out as null, and
-     * is evenutally set when messaga arrives. If the metadata
+     * is eventually set when message arrives. If the metadata
      * is known when the message arrives, then piece availability
      * of the peer can be set, otherwise this availability must
      * be set by the BEP9 extension which also sets the metadata.
@@ -349,33 +379,31 @@ public class Connection {
 
             switch (id) {
 
-                case CHOKE:
+                case CHOKE: // Peer just choked us
 
-                    // Peer just choked us
+                    // Set choking state in peer state to true
                     peerState.setChoking(true);
 
                     break;
-                case UNCHOKE:
+                case UNCHOKE: // Peer just unchoked us
 
-                    // Peer just unchoked us
+                    // Set choking state in peer state to false
                     peerState.setChoking(false);
 
                     break;
-                case INTERESTED:
+                case INTERESTED: // Peer is interested in getting piece from us
 
-                    // Peer is interested in getting piece from us
+                    // Set interested state in peer state to true
                     peerState.setInterested(true);
 
                     break;
-                case NOT_INTERESTED:
+                case NOT_INTERESTED: // Peer is not interested in getting piece from us
 
-                    // Peer is not interested in getting piece from us
+                    // Set interested state in peer state to false
                     peerState.setInterested(false);
 
                     break;
-                case HAVE:
-
-                    // Peer has a new piece
+                case HAVE: // Peer has a new piece
 
                     // Do we have metainfo yet
                     if(swarm.isMetaInformationKnown()) {
@@ -385,20 +413,21 @@ public class Connection {
                         // Check that have message is indeed valid
                         int numberOfPiecesInTorrent = swarm.getMetaInformation().getNumberOfPiecesInTorrent();
                         if(haveMessage.validate(numberOfPiecesInTorrent)) {
-                            peerState.alterPieceAvailability(haveMessage.getPieceIndex(), true); // and alter availability based on it
 
-                            // If we are downloading, and this was piece we need, then alter interestedness.
+                            int pieceIndex = haveMessage.getPieceIndex();
 
+                            // Alter availability of piece
+                            peerState.alterPieceAvailability(pieceIndex, true);
 
+                            // Update interested state i required
+                            alterMyInterestedStateIfNeeded(pieceIndex);
 
                         } else
                             throw new InvalidPieceIndexInHaveMessage(haveMessage.getPieceIndex(), numberOfPiecesInTorrent); // or throw exceptions if invalid
                     }
 
                     break;
-                case BITFIELD:
-
-                    // Peer announces what pieces it has
+                case BITFIELD: // Peer announces what pieces it has
 
                     // If we have already received this message, we raise an exception, since it should only be sent once.
                     if(receivedBitField != null)
@@ -408,7 +437,7 @@ public class Connection {
                         // otherwise save it the first time
                         receivedBitField = (BitField)m;
 
-                        // If meta information is known, then update piece availability
+                        // if meta information is known, then update piece availability
                         if(swarm.isMetaInformationKnown()) {
 
                             int numberOfPieces = swarm.getMetaInformation().getNumberOfPiecesInTorrent();
@@ -419,40 +448,47 @@ public class Connection {
                             else { // and then alter peer piece availability based
                                 peerState.setPieceAvailability(receivedBitField.getBooleanBitField(numberOfPieces));
 
-                                // If we are downloading, and this was piece we need, then alter interestedness.
+                                // If we are not presently interested, then check if any pieces in this bitfield
+                                // warrant changing client state.
+                                if(!clientState.isInterested()) {
 
+                                    // Iterate bitfield
+                                    for (int pieceIndex = 0; pieceIndex < numberOfPieces; pieceIndex++) {
+
+                                        // Update interested state i required, and if we change state to positive
+                                        // then we are done, no need to keep resending.
+                                        if (alterMyInterestedStateIfNeeded(pieceIndex))
+                                            break;
+                                    }
+                                }
                             }
                         }
                     }
 
                     break;
-                case REQUEST:
+                case REQUEST: // Peer requests piece block
 
-                    // Peer requests pieces
-                    peerState.registerRequest((Request) m);
-
-                    break;
-                case PIECE:
-
-                    // send out have?
+                    // Add request to list of unprocessed requests from this peer
+                    peerState.registerRequest((Request)m);
 
                     break;
-                case CANCEL:
+                case PIECE: // Peer sends us a piece block
 
-                    // dont upload to peer or something?
+
+
+
+                    break;
+                case CANCEL: // Peer wants to cancel a previous request
 
                     // Remove the request message corresponding to this cancel message
-                    peerState.unregisterRequest(m.toRequestMessage());
+                    // from the list of unprocessed requests form this peer.
+                    peerState.unregisterRequest(((Cancel) m).toRequestMessage());
 
                     break;
-                case PORT:
-
-                    // this is for dht client
-                    System.out.print("later");
+                case PORT: // DHT port announcement
 
                     break;
-
-                case EXTENDED:
+                case EXTENDED: // Peer sent a BEP10 extended message
 
                     Extended extendedMessage = (Extended)m;
 
@@ -546,6 +582,33 @@ public class Connection {
 
         // Create message and return
         return new ExtendedHandshake(handshakePayload);
+    }
+
+    /**
+     * If
+     * a) we are downloading
+     * b) this is a piece we need
+     * c) we are presently not interested in this peer
+     * then alter state of client side of connection,
+     * and send an INTERESTED message to my peer.
+     * @param pieceIndex
+     * @return true if we sent altered state and sent message
+     */
+    public boolean alterMyInterestedStateIfNeeded(int pieceIndex) {
+
+        if(swarm.getSwarmState() == Swarm.TorrentSwarmState.ON &&
+           clientState.isPieceAvailabilityKnown() && clientState.isPieceAvailable(pieceIndex) &&
+           !clientState.isInterested()) {
+
+            // alter interested state
+            clientState.setInterested(true);
+
+            // and let peer know.
+            enqueueMessageForSending(new Interested());
+
+            return true;
+        } else
+            return false;
     }
 
     /**
