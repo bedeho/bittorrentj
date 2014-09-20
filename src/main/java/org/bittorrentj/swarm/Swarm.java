@@ -31,11 +31,11 @@ public class Swarm extends Thread {
      * OFF corresponds to rejecting all seed requests.
      */
 
-    public enum TorrentSwarmState {
-        ON,OFF;
+    public enum SwarmState {
+        ON_NORMAL, ON_ENDGAME, OFF;
     }
 
-    private TorrentSwarmState swarmState;
+    private SwarmState swarmState;
 
     /**
      * Multiplexing selector for swarm connectivity
@@ -100,18 +100,7 @@ public class Swarm extends Thread {
      */
     private final static int KEEP_ALIVE_INTERVAL = 60*1000;
 
-
-
-    // diskworker?
-
-    // State
-
-    /**
-     * Availability of pieces for this torrent.
-     */
-    private boolean [] globalPieceAvailability;
-
-    public Swarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions, TorrentSwarmState swarmState) {
+    public Swarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions, SwarmState swarmState) {
 
         this.infoHash = infoHash;
         this.metaInformation = metaInformation;
@@ -123,11 +112,6 @@ public class Swarm extends Thread {
         } catch (IOException e) {
             System.out.println("How can we possibly end up here"); // log later or something
         }
-
-        //
-        //this.globalPieceAvailability =
-
-                //Extension[i].addTorrent(this or info_hash, does it really need to know - can extension trust info, is it thread safe? ut_metdata would need to even modify!!!);
     }
 
     @Override
@@ -137,48 +121,30 @@ public class Swarm extends Thread {
 
             // how to stop???
 
-            // Process network channel events
-            processNetwork();
+            // Think about the order of the processing below
 
-            /**
-             * processOther things??
-             *
-             *
-
-
-             // process event where a piece which was finally written to org.bittorrentj.disk!!
-
-
-
-
-            /**
-             *
-             *             // Disconnect connections which have taken to long to talk to us,
-             // send keep-alive if we have not written anything in a while
-             long nowDateInMs = new Date().getTime();
-
-             // Close if it has taken more time than upper limit,
-             // otherwise send keep-alive if we have not written in a while
-             if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
-             closeConnection(connection);
-             else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
-             connection.enqueueMessageForSending(new KeepAlive());
-             *
-             */
-
-            // stop downloading pieces from someone who is just super slow,or who did not respond to our request?
-
-            // if we have to few connections now, how do we get more peers?
+            //
+            readAndWriteMessages();
 
             // choking algorithm, and optimistic unchoking
+            updateChokingState();
+
+            requestPieces();
+
+            sendPieces();
 
             // extension processing called as well
+            processExtensions();
 
-
+            // if we have to few connections now, how do we get more peers?
+            manageConnectivity();
         }
     }
 
-    private void processNetwork() {
+    /**
+     *
+     */
+    private void readAndWriteMessages() {
 
         // Get next channel event
         int numberOfUpdatedKeys = 0;
@@ -251,6 +217,53 @@ public class Swarm extends Thread {
             }
         }
     }
+
+    private void updateChokingState() {
+
+        // stop downloading pieces from someone who is just super slow,or who did not respond to our request?
+
+    }
+
+    private void requestPieces() {
+
+    }
+
+    private void sendPieces() {
+
+    }
+
+    private void pickNextPiece() {
+
+        // should hvae streamin and rarest first
+
+    }
+
+    private void processExtensions() {
+
+    }
+
+    private void manageConnectivity() {
+
+        /**
+         *
+         // Disconnect connections which have taken to long to talk to us,
+         // send keep-alive if we have not written anything in a while
+         long nowDateInMs = new Date().getTime();
+
+         // Close if it has taken more time than upper limit,
+         // otherwise send keep-alive if we have not written in a while
+         if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
+         closeConnection(connection);
+         else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
+         connection.enqueueMessageForSending(new KeepAlive());
+         *
+         */
+
+
+        // if we have to few connections now, how do we get more peers?
+
+    }
+
 
     /**
      *
@@ -344,17 +357,20 @@ public class Swarm extends Thread {
      */
     public boolean isMetaInformationKnown() { return metaInformation != null;}
 
-    public int
+    public int sizeOfBlockWeDoNotHave(int begin, int block, int length) {
+
+    }
 
     public MetaInfo getMetaInformation() {
         return metaInformation;
     }
 
-    public TorrentSwarmState getSwarmState() {
+    public SwarmState getSwarmState() {
         return swarmState;
     }
 
-    public void setSwarmState(TorrentSwarmState swarmState) {
+    // who calls this
+    public void setSwarmState(SwarmState swarmState) {
 
         // do lots of other stuff?
 

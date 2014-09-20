@@ -30,8 +30,13 @@ public class Connection {
 
     /**
      * State of client side of connection.
+     *
      * Ideally, this state should be the same for all connections,
      * but there may be cases where more flexibility is needed.
+     *
+     * I THINK I SHOULD PERHAPS REMOVE THIS, SINCE MANY FIELDS
+     * ARE NOT USEFUL, AND THE ONCE THAT ARE CAN JUST BE MAINTAINED MANUALLY
+     *
      */
     private PeerState clientState;
 
@@ -55,35 +60,6 @@ public class Connection {
      */
     private SocketChannel channel;
 
-    /**
-     * Read buffer for network
-     */
-    private ByteBuffer networkReadBuffer;
-
-    /**
-     * Size (bytes) of networkReadBuffer
-     */
-    public final static int NETWORK_READ_BUFFER_SIZE = 10 * 1024 * 1024;
-
-    /**
-     * Position in networkReadBuffer where data
-     * begins which has not been processed by readMessagesFromChannel() and
-     * subsequently turned into a message in readMessagesQueue
-     */
-    private int startPositionOfDataInReadBuffer;
-    private int copyAtEdgeEvent; // purely a performance statistic to assess whether circluar buffer is needed
-
-    /**
-     * The size of the window used to measure network io (up/down) speed
-     * over, in milliseconds.
-     */
-    private final static int NETWORK_IO_SPEED_MEASUREMENT_WINDOW_SIZE = 1000; // (ms)
-
-    /**
-     * Counts the amount of raw data read into the network read buffer
-     * within present averaging window.
-     */
-    private int rawDownloadCounter;
 
     /**
      * Counts the amount of data received in piece messages
@@ -159,13 +135,12 @@ public class Connection {
         this.receivedBitField = null;
 
         this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
-        this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
+
         this.readMessagesQueue = new LinkedList<MessageWithLengthField>();
         this.writeMessagesQueue = new LinkedList<MessageWithLengthField>();
 
         this.bytesInWriteBuffer = 0;
-        this.startPositionOfDataInReadBuffer = 0;
-        this.copyAtEdgeEvent = 0;
+
 
         /**
          * If we have knowledge about piece availability, e.g. because
@@ -193,109 +168,6 @@ public class Connection {
      */
     public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
 
-        // The number of bytes read from socket into read buffer in last iteration of next loop
-        int numberOfBytesRead;
-
-        /**
-         * Read from channel into network read buffer so long as we can,
-         * this may be possible multiple times if read buffer is comparatively
-         * smaller compared to kernel socket buffer and incoming traffic/bandwidth.
-         */
-        while((numberOfBytesRead = channel.read(networkReadBuffer)) > 0) {
-
-            // Note where in buffer data ends
-            int endPositionOfDataInReadBuffer = networkReadBuffer.position();
-
-            // Each iteration attempts to read one message from channel buffer
-            int numberOfUnconsumedBytes;
-            while (true) {
-
-                // Remaining space in buffer which has not been processed into a message
-                numberOfUnconsumedBytes = endPositionOfDataInReadBuffer - startPositionOfDataInReadBuffer;
-
-                /**
-                * Do we have enough space in buffer for length field of new message?,
-                * if not we are done reading from buffer, and we stop without
-                * advancing buffer read position.
-                */
-                if (numberOfUnconsumedBytes < MessageWithLengthField.LENGTH_FIELD_SIZE)
-                    break;
-
-                // Read length field of new message in as four byte big-endian integer, without altering buffer position
-                int messageIdAndPayloadSize = networkReadBuffer.getInt(startPositionOfDataInReadBuffer);
-
-                // Get total size of message as claimed by length field
-                int totalMessageSize = MessageWithLengthField.LENGTH_FIELD_SIZE + messageIdAndPayloadSize;
-
-                /**
-                * Check if peer is attempting to send a message we can never process,
-                * that is a message greater than read buffer. If so we throw an exceptions.
-                */
-                if (totalMessageSize > NETWORK_READ_BUFFER_SIZE)
-                    throw new MessageToLargeForNetworkBufferException(totalMessageSize, NETWORK_READ_BUFFER_SIZE);
-
-                /**
-                 * Check that buffer does contain a full new message,
-                 * that is: <length><id><payload>.
-                 * if not we are done reading from buffer, and we stop without
-                 * advancing buffer read position.
-                 */
-                if (numberOfUnconsumedBytes >= totalMessageSize) {
-
-                    // Wrap in a temporary read only buffer
-                    ByteBuffer temporaryBuffer = networkReadBuffer.duplicate().asReadOnlyBuffer();
-
-                    // and make sure this buffer starts where message starts
-                    temporaryBuffer.position(startPositionOfDataInReadBuffer);
-
-                    // and ends where message ends
-                    temporaryBuffer.limit(startPositionOfDataInReadBuffer + totalMessageSize);
-
-                    // Process buffer and generate new message
-                    MessageWithLengthField m;
-
-                    try {
-                        m = MessageWithLengthField.create(temporaryBuffer, activeClientExtensions);
-                    } catch (Exception e){
-                        throw new InvalidMessageReceivedException(e);
-                    }
-
-                    // Save message in read queue
-                    readMessagesQueue.add(m);
-
-                    // Advance position in buffer
-                    startPositionOfDataInReadBuffer += messageIdAndPayloadSize;
-                }
-            }
-
-            // If buffer is completely consumed, then we reset it
-            // to postpone copy at edge event
-            if (numberOfUnconsumedBytes == 0) {
-                networkReadBuffer.clear();
-                startPositionOfDataInReadBuffer = 0;
-            } else if (!networkReadBuffer.hasRemaining()) {
-
-                // If unconsumed data touches buffer limit,
-                // then copy to the front of the buffer.
-
-                // We use compact() to do this, and therefor we have to
-                // first set position to data we want at start of buffer
-                networkReadBuffer.position(startPositionOfDataInReadBuffer);
-
-                // and then limit is set to end of data.
-                networkReadBuffer.limit(endPositionOfDataInReadBuffer);
-
-                // Do copying
-                networkReadBuffer.compact();
-
-                // Note this compacting event, since its costly.
-                copyAtEdgeEvent++;
-            }
-
-            if(numberOfBytesRead > 0);
-                // log bytes written
-
-        }
     }
 
     /**
@@ -474,7 +346,18 @@ public class Connection {
                     break;
                 case PIECE: // Peer sends us a piece block
 
+                    Piece pieceMessage = (Piece)m;
 
+                    int sizeOfNewData = swarm.sizeOfBlockWeDoNotHave(pieceMessage.getIndex(), pieceMessage.getBegin() , pieceMessage.getBlock().length);
+
+                    if(sizeOfNewData > 0) {
+
+                        // Add the new part as part of download counter
+                        validPieceDownloadCounter += sizeOfNewData;
+
+
+
+                    }
 
 
                     break;
@@ -486,6 +369,8 @@ public class Connection {
 
                     break;
                 case PORT: // DHT port announcement
+
+                    // Call dhtj
 
                     break;
                 case EXTENDED: // Peer sent a BEP10 extended message
@@ -530,8 +415,6 @@ public class Connection {
         }
 
     }
-
-
 
     /**
      * Add a message to the write queue of the connection.
@@ -596,7 +479,7 @@ public class Connection {
      */
     public boolean alterMyInterestedStateIfNeeded(int pieceIndex) {
 
-        if(swarm.getSwarmState() == Swarm.TorrentSwarmState.ON &&
+        if(swarm.getSwarmState() != Swarm.SwarmState.OFF &&
            clientState.isPieceAvailabilityKnown() && clientState.isPieceAvailable(pieceIndex) &&
            !clientState.isInterested()) {
 

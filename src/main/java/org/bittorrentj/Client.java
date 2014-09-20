@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.io.IOException;
 
 import org.bittorrentj.command.Command;
+import org.bittorrentj.disk.DiskManager;
 import org.bittorrentj.event.Event;
 import org.bittorrentj.event.StartServerErrorEvent;
 import org.bittorrentj.event.ToManyConnectionsEvent;
@@ -114,6 +115,11 @@ public class Client extends Thread {
             this.hanshakeBegan = new Date();
         }
     }
+
+    /**
+     * Disk
+     */
+    private DiskManager diskManager;
 
     /**
      * Constructor
