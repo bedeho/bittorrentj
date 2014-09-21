@@ -5,8 +5,7 @@ A BitTorrent client library in Java.
 
 Architecture
 --------
-The library is inspired by the libtorrent library of Arvid Nordberg,
-and has some architectural similarities.
+Say something about threading model, message passing etc, the different classes, e.g. put in class diagram.
 
 Features
 --------
@@ -24,6 +23,8 @@ The following bittorrent enhancement proposals (BEPs) are supported
 
 Extension API
 --------
+The library was written in part specifically to facilitate deep and powerful extensions which
+could could be as tightly coupled with the core client as necessary.
 
 Install
 --------

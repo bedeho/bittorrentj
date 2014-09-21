@@ -1,8 +1,9 @@
-package org.bittorrentj.message;
+package org.bittorrentj.swarm.connection;
 
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.extension.Extension;
+import org.bittorrentj.message.MessageWithLengthField;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -14,9 +15,11 @@ import java.util.LinkedList;
 /**
  * Created by bedeho on 20.09.2014.
  *
- *
+ * Stream which buffers communication with an underlying SocketChannel,
+ * so as to create read and write methods on the Message level.
+ * Also, the stream has reading/writing bandwidth utilization management.
  */
-public class MessageStream {
+public class InputMessageStream {
 
     /**
      * Channel from/to which messages are read/written
@@ -27,6 +30,11 @@ public class MessageStream {
      * All extensions registered.
      */
     HashMap<Integer, Extension> extensions;
+
+    /**
+     *
+     */
+    MessageStreamManager manager;
 
     /**
      * Read buffer for network
@@ -47,60 +55,19 @@ public class MessageStream {
     private int copyAtEdgeEvent; // purely a performance statistic to assess whether circular buffer is needed
 
     /**
-     * The size of the window used to measure network io (up/down) speed
-     * over, in milliseconds.
-     */
-    private final static int NETWORK_IO_SPEED_MEASUREMENT_WINDOW_SIZE = 1000; // (ms)
-
-    /**
-     * Counts the amount of raw data read into the network read buffer
-     * within present averaging window.
-     */
-    private int rawDownloadCounter;
-
-    /**
-     *
-     */
-    private int maximumDownloadRate;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /**
-     * Date and time when data was written to channel for this connection
-     */
-    private Date timeLastDataSent;
-
-    /**
-     * Date and time when data was read from channel for this connection
-     */
-    private Date timeLastDataReceived;
-
-
-
-    /**
      * Constructor
      * @param channel
+     * @param extensions
+     * @param manager
      */
-    MessageStream(SocketChannel channel, HashMap<Integer, Extension> extensions) {
+    InputMessageStream(SocketChannel channel, HashMap<Integer, Extension> extensions, MessageStreamManager manager) {
 
         this.channel = channel;
         this.extensions = extensions;
+        this.manager = manager;
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
         this.startPositionOfDataInReadBuffer = 0;
         this.copyAtEdgeEvent = 0;
-        this.rawDownloadCounter = 0;
     }
 
     /**
@@ -188,7 +155,8 @@ public class MessageStream {
 
                     // Advance position in buffer
                     startPositionOfDataInReadBuffer += messageIdAndPayloadSize;
-                }
+                } else
+                    break;
             }
 
             // If buffer is completely consumed, then we reset it
@@ -222,25 +190,6 @@ public class MessageStream {
             totalNumberOfBytesRead += numberOfBytesRead;
         }
 
-        return numberOfBytesRead;
+        return totalNumberOfBytesRead;
     }
-
-
-    public Date getTimeLastDataSent() {
-        return timeLastDataSent;
-    }
-
-    private void setTimeLastDataSent(Date timeLastDataSent) {
-        this.timeLastDataSent = timeLastDataSent;
-    }
-
-    public Date getTimeLastDataReceived() {
-        return timeLastDataReceived;
-    }
-
-    private void setTimeLastDataReceived(Date timeLastDataReceived) {
-        this.timeLastDataReceived = timeLastDataReceived;
-    }
-
-
 }

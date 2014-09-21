@@ -1,4 +1,4 @@
-package org.bittorrentj.swarm;
+package org.bittorrentj.swarm.connection;
 
 import org.bittorrentj.bencodej.BencodableByteString;
 import org.bittorrentj.bencodej.BencodeableDictionary;
@@ -10,6 +10,7 @@ import org.bittorrentj.message.exceptions.MalformedMDictionaryException;
 import org.bittorrentj.message.exceptions.PayloadDoesNotContainMDictionaryException;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.MessageId;
+import org.bittorrentj.swarm.Swarm;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -47,7 +48,7 @@ public class Connection {
      * Stream used to asynchronously read and write messages
      * to channel.
      */
-    private MessageStream stream;
+    private InputMessageStream stream;
 
 
     /**
@@ -127,7 +128,7 @@ public class Connection {
     /**
      * Constructor
      */
-    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, MessageStream stream, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, InputMessageStream stream, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
         this.swarm = swarm;
         this.clientState = clientState;
@@ -152,7 +153,7 @@ public class Connection {
         if(clientState.isPieceAvailabilityKnown())
             enqueueMessageForSending(new BitField(clientState.getAdvertisedPieceAvailability()));
 
-        // ALTER LOGIC SO THAT MESSAG PARSING RESPECTS WHETHER CLIENT SIDE OF CONNECTION ACTUALY HAS bep10 ENABLED.
+        // ALTER LOGIC SO THAT MESSAGE PARSING RESPECTS WHETHER CLIENT SIDE OF CONNECTION ACTUALY HAS bep10 ENABLED.
 
         /**
          * If both client and peer support BEP10, then we also send extended handshake.
@@ -430,6 +431,7 @@ public class Connection {
         if(m == null)
             throw new IllegalArgumentException();
         else {
+
             writeMessagesQueue.add(m);
 
             /**
@@ -506,8 +508,7 @@ public class Connection {
     public MessageWithLengthField getNextReceivedMessage() {
         return readMessagesQueue.poll();
     }
-*/
-
+    */
 
     public PeerState getPeerState() {
         return peerState;

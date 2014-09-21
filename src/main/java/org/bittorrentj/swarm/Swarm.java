@@ -16,6 +16,7 @@ import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
+import org.bittorrentj.swarm.connection.Connection;
 import org.bittorrentj.torrent.MetaInfo;
 
 /**
@@ -127,7 +128,6 @@ public class Swarm extends Thread {
             //
             readAndWriteMessages();
 
-            processReadMessages();
 
             // choking algorithm, and optimistic unchoking
             updateChokingState();
@@ -174,8 +174,30 @@ public class Swarm extends Thread {
             try {
 
                 // Read from channel if ready
-                if (key.isReadable())
+                if (key.isReadable()) {
                     connection.readMessagesFromChannel();
+
+                    // Process message queue just populated
+                    try {
+                        connection.processReadMessageQueue();
+                    } catch (UnsupportedExtendedMessageFoundException e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    } catch (ReceivedBitFieldMoreThanOnce e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    } catch (InvalidPieceIndexInHaveMessage e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    } catch (InvalidBitFieldMessage e) {
+                        closeConnection(connection);
+                        //return;
+                        // or just ignore ?
+                    }
+                }
 
                 // Write to channel if ready
                 if (key.isWritable())
@@ -194,32 +216,6 @@ public class Swarm extends Thread {
             } finally {
                 // Close connection with this peer
                 closeConnection(connection);
-            }
-        }
-    }
-
-    private void processReadMessages() {
-
-        for(Connection c: connections.values()) {
-
-            try {
-                c.processReadMessageQueue();
-            } catch (UnsupportedExtendedMessageFoundException e) {
-                closeConnection(c);
-                //return;
-                // or just ignore ?
-            } catch (ReceivedBitFieldMoreThanOnce e) {
-                closeConnection(c);
-                //return;
-                // or just ignore ?
-            } catch (InvalidPieceIndexInHaveMessage e) {
-                closeConnection(c);
-                //return;
-                // or just ignore ?
-            } catch (InvalidBitFieldMessage e) {
-                closeConnection(c);
-                //return;
-                // or just ignore ?
             }
         }
     }
@@ -260,7 +256,7 @@ public class Swarm extends Thread {
          // otherwise send keep-alive if we have not written in a while
          if(nowDateInMs - connection.getTimeLastDataReceived().getTime() > MAX_SILENCE_DURATION)
          closeConnection(connection);
-         else if(nowDateInMs - connection.getTimeLastDataSent().getTime() > KEEP_ALIVE_INTERVAL)
+         else if(nowDateInMs - connection.getTimeLastDataTransmitted().getTime() > KEEP_ALIVE_INTERVAL)
          connection.enqueueMessageForSending(new KeepAlive());
          *
          */
