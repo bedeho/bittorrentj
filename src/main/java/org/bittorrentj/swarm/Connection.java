@@ -13,10 +13,8 @@ import org.bittorrentj.message.field.MessageId;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Date;
 
 /**
  * Created by bedeho on 30.08.2014.
@@ -46,19 +44,10 @@ public class Connection {
     private PeerState peerState;
 
     /**
-     * Date and time when data was written to channel for this connection
+     * Stream used to asynchronously read and write messages
+     * to channel.
      */
-    private Date timeLastDataSent;
-
-    /**
-     * Date and time when data was read from channel for this connection
-     */
-    private Date timeLastDataReceived;
-
-    /**
-     * Channel for this connection
-     */
-    private SocketChannel channel;
+    private MessageStream stream;
 
 
     /**
@@ -72,6 +61,10 @@ public class Connection {
      * and pieces we don't need.
      */
     private int validPieceDownloadCounter;
+
+
+
+
 
     /**
      * Write buffer for network
@@ -95,6 +88,16 @@ public class Connection {
      * can also be state when buffer is perfectly empty.
      */
     private int bytesInWriteBuffer;
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Queue of messages which have been read but not processed
@@ -124,11 +127,12 @@ public class Connection {
     /**
      * Constructor
      */
-    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, MessageStream stream, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
         this.swarm = swarm;
         this.clientState = clientState;
         this.peerState = peerState;
+        this.stream = stream;
 
         this.activeClientExtensions = activeClientExtensions;
 
@@ -141,13 +145,14 @@ public class Connection {
 
         this.bytesInWriteBuffer = 0;
 
-
         /**
          * If we have knowledge about piece availability, e.g. because
          * are are resuming a download, then send a bitfield message.
          */
         if(clientState.isPieceAvailabilityKnown())
-            enqueueMessageForSending(new BitField(clientState.getPieceAvailability()));
+            enqueueMessageForSending(new BitField(clientState.getAdvertisedPieceAvailability()));
+
+        // ALTER LOGIC SO THAT MESSAG PARSING RESPECTS WHETHER CLIENT SIDE OF CONNECTION ACTUALY HAS bep10 ENABLED.
 
         /**
          * If both client and peer support BEP10, then we also send extended handshake.
@@ -163,11 +168,10 @@ public class Connection {
     }
 
     /**
-     * Attempts to read from channel when OP_READ is registered,
-     * and put full messages in readMessagesQueue.
+     * Is called when OP_READ is registered with channel and put full messages in readMessagesQueue.
      */
     public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
-
+        stream.read(readMessagesQueue);
     }
 
     /**
@@ -227,7 +231,7 @@ public class Connection {
 
         // Process new message
         MessageWithLengthField m;
-        while((m = getNextReceivedMessage()) != null)
+        while((m = readMessagesQueue.poll()) != null)
             processMessage(m);
     }
 
@@ -318,7 +322,7 @@ public class Connection {
                             if(!receivedBitField.validateBitField(numberOfPieces))
                                 throw new InvalidBitFieldMessage(receivedBitField);
                             else { // and then alter peer piece availability based
-                                peerState.setPieceAvailability(receivedBitField.getBooleanBitField(numberOfPieces));
+                                peerState.setAdvertisedPieceAvailability(receivedBitField.getBooleanBitField(numberOfPieces));
 
                                 // If we are not presently interested, then check if any pieces in this bitfield
                                 // warrant changing client state.
@@ -498,26 +502,12 @@ public class Connection {
      * Grabs a message from the front of the read queue of the connection,
      * or return null if queue empty.
      * @return message
-     */
+
     public MessageWithLengthField getNextReceivedMessage() {
         return readMessagesQueue.poll();
     }
+*/
 
-    public Date getTimeLastDataSent() {
-        return timeLastDataSent;
-    }
-
-    public void setTimeLastDataSent(Date timeLastDataSent) {
-        this.timeLastDataSent = timeLastDataSent;
-    }
-
-    public Date getTimeLastDataReceived() {
-        return timeLastDataReceived;
-    }
-
-    public void setTimeLastDataReceived(Date timeLastDataReceived) {
-        this.timeLastDataReceived = timeLastDataReceived;
-    }
 
     public PeerState getPeerState() {
         return peerState;

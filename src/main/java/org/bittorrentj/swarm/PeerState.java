@@ -26,9 +26,10 @@ public class PeerState {
     private boolean interested;
 
     /**
-     * Most recent knowledge of piece availability.
+     * Most recent knowledge of piece availability,
+     * based BITFIELD and subsequent HAVE messages.
      */
-    private boolean [] pieceAvailability;
+    private boolean [] advertisedPieceAvailability;
 
     /**
      * Handshake transmitted by peer during connection setup.
@@ -50,12 +51,12 @@ public class PeerState {
      * Constructor
      * @param choking
      * @param interested
-     * @param pieceAvailability
+     * @param advertisedPieceAvailability
      */
-    PeerState(boolean choking, boolean interested, boolean [] pieceAvailability, Handshake handshake, ExtendedHandshake extendedHandshake) {
+    PeerState(boolean choking, boolean interested, boolean [] advertisedPieceAvailability, Handshake handshake, ExtendedHandshake extendedHandshake) {
         this.choking = choking;
         this.interested = interested;
-        this.pieceAvailability = pieceAvailability;
+        this.advertisedPieceAvailability = advertisedPieceAvailability;
         this.unsatisfiedRequests = new LinkedList<Request>();
 
         this.handshake = handshake;
@@ -92,32 +93,32 @@ public class PeerState {
      * in this object.
      * @return
      */
-    public boolean[] getPieceAvailability() {
-        return pieceAvailability.clone();
+    public boolean[] getAdvertisedPieceAvailability() {
+        return advertisedPieceAvailability.clone();
     }
 
-    public void setPieceAvailability(boolean[] pieceAvailability) {
-        this.pieceAvailability = pieceAvailability;
+    public void setAdvertisedPieceAvailability(boolean[] advertisedPieceAvailability) {
+        this.advertisedPieceAvailability = advertisedPieceAvailability;
     }
 
     public boolean isPieceAvailabilityKnown() {
-        return pieceAvailability != null;
+        return advertisedPieceAvailability != null;
     }
 
     public boolean isPieceAvailable(int index) {
 
-        if(pieceAvailability == null)
+        if(advertisedPieceAvailability == null)
             throw new IllegalStateException();
         else
-            return pieceAvailability[index];
+            return advertisedPieceAvailability[index];
     }
 
     public void alterPieceAvailability(int index, boolean availability) {
 
-        if(pieceAvailability == null)
+        if(advertisedPieceAvailability == null)
             throw new IllegalStateException();
         else
-            pieceAvailability[index] = availability;
+            advertisedPieceAvailability[index] = availability;
     }
 
     /**

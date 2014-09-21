@@ -2,16 +2,19 @@ package org.bittorrentj.message;
 
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
 import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
+import org.bittorrentj.extension.Extension;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 
 /**
  * Created by bedeho on 20.09.2014.
  *
- * 
+ *
  */
 public class MessageStream {
 
@@ -19,6 +22,11 @@ public class MessageStream {
      * Channel from/to which messages are read/written
      */
     SocketChannel channel;
+
+    /**
+     * All extensions registered.
+     */
+    HashMap<Integer, Extension> extensions;
 
     /**
      * Read buffer for network
@@ -36,7 +44,7 @@ public class MessageStream {
      * subsequently turned into a message in readMessagesQueue
      */
     private int startPositionOfDataInReadBuffer;
-    private int copyAtEdgeEvent; // purely a performance statistic to assess whether circluar buffer is needed
+    private int copyAtEdgeEvent; // purely a performance statistic to assess whether circular buffer is needed
 
     /**
      * The size of the window used to measure network io (up/down) speed
@@ -50,17 +58,63 @@ public class MessageStream {
      */
     private int rawDownloadCounter;
 
+    /**
+     *
+     */
+    private int maximumDownloadRate;
 
-    MessageStream(SocketChannel channel) {
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /**
+     * Date and time when data was written to channel for this connection
+     */
+    private Date timeLastDataSent;
+
+    /**
+     * Date and time when data was read from channel for this connection
+     */
+    private Date timeLastDataReceived;
+
+
+
+    /**
+     * Constructor
+     * @param channel
+     */
+    MessageStream(SocketChannel channel, HashMap<Integer, Extension> extensions) {
+
+        this.channel = channel;
+        this.extensions = extensions;
         this.networkReadBuffer = ByteBuffer.allocateDirect(NETWORK_READ_BUFFER_SIZE);
         this.startPositionOfDataInReadBuffer = 0;
         this.copyAtEdgeEvent = 0;
-
+        this.rawDownloadCounter = 0;
     }
 
-    int read(LinkedList<MessageWithLengthField> readMessagesQueue ) throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException  {
+    /**
+     * Read as many messages from socket as possible
+     * @param readMessagesQueue
+     * @return number of bytes
+     * @throws IOException
+     * @throws MessageToLargeForNetworkBufferException
+     * @throws InvalidMessageReceivedException
+     */
+    public int read(LinkedList<MessageWithLengthField> readMessagesQueue) throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException  {
 
+        // The number of bytes read in total
+        int totalNumberOfBytesRead = 0;
 
         // The number of bytes read from socket into read buffer in last iteration of next loop
         int numberOfBytesRead;
@@ -124,7 +178,7 @@ public class MessageStream {
                     MessageWithLengthField m;
 
                     try {
-                        m = MessageWithLengthField.create(temporaryBuffer, activeClientExtensions);
+                        m = MessageWithLengthField.create(temporaryBuffer, extensions);
                     } catch (Exception e){
                         throw new InvalidMessageReceivedException(e);
                     }
@@ -164,9 +218,29 @@ public class MessageStream {
             if(numberOfBytesRead > 0);
             // log bytes written
 
+            // Count number of bytes read as part of total for this call
+            totalNumberOfBytesRead += numberOfBytesRead;
         }
 
         return numberOfBytesRead;
     }
+
+
+    public Date getTimeLastDataSent() {
+        return timeLastDataSent;
+    }
+
+    private void setTimeLastDataSent(Date timeLastDataSent) {
+        this.timeLastDataSent = timeLastDataSent;
+    }
+
+    public Date getTimeLastDataReceived() {
+        return timeLastDataReceived;
+    }
+
+    private void setTimeLastDataReceived(Date timeLastDataReceived) {
+        this.timeLastDataReceived = timeLastDataReceived;
+    }
+
 
 }

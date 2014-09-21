@@ -58,7 +58,7 @@ public class Swarm extends Thread {
     private Client client;
 
     /**
-     * Maps IP:Port to corresponding connection object
+     * Maps IP:Port string to corresponding connection
      */
     private HashMap<InetSocketAddress, Connection> connections;
 
@@ -122,9 +122,12 @@ public class Swarm extends Thread {
             // how to stop???
 
             // Think about the order of the processing below
+            // Also perhaps refactor them some more to make them bemore testable and have more precise/stateless behaviour.
 
             //
             readAndWriteMessages();
+
+            processReadMessages();
 
             // choking algorithm, and optimistic unchoking
             updateChokingState();
@@ -137,7 +140,7 @@ public class Swarm extends Thread {
             processExtensions();
 
             // if we have to few connections now, how do we get more peers?
-            manageConnectivity();
+            manageConnectivity(); // should this perhaps  be the first one, so we dont need to bother with all other stuff
         }
     }
 
@@ -170,34 +173,11 @@ public class Swarm extends Thread {
 
             try {
 
-                // Ready to be read
-                if (key.isReadable()) {
-
-                    // Read from channel
+                // Read from channel if ready
+                if (key.isReadable())
                     connection.readMessagesFromChannel();
 
-                    try {
-                        connection.processReadMessageQueue();
-                    } catch (UnsupportedExtendedMessageFoundException e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    } catch (ReceivedBitFieldMoreThanOnce e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    } catch (InvalidPieceIndexInHaveMessage e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    } catch (InvalidBitFieldMessage e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    }
-                }
-
-                // Ready to be written to
+                // Write to channel if ready
                 if (key.isWritable())
                     connection.writeMessagesToChannel();
 
@@ -208,12 +188,38 @@ public class Swarm extends Thread {
                 //// closeConnection(connection); ????
 
             } catch (MessageToLargeForNetworkBufferException e) {
-
+                // ?
             } catch (InvalidMessageReceivedException e) {
-
+                // ?
             } finally {
                 // Close connection with this peer
                 closeConnection(connection);
+            }
+        }
+    }
+
+    private void processReadMessages() {
+
+        for(Connection c: connections.values()) {
+
+            try {
+                c.processReadMessageQueue();
+            } catch (UnsupportedExtendedMessageFoundException e) {
+                closeConnection(c);
+                //return;
+                // or just ignore ?
+            } catch (ReceivedBitFieldMoreThanOnce e) {
+                closeConnection(c);
+                //return;
+                // or just ignore ?
+            } catch (InvalidPieceIndexInHaveMessage e) {
+                closeConnection(c);
+                //return;
+                // or just ignore ?
+            } catch (InvalidBitFieldMessage e) {
+                closeConnection(c);
+                //return;
+                // or just ignore ?
             }
         }
     }
@@ -372,7 +378,7 @@ public class Swarm extends Thread {
     // who calls this
     public void setSwarmState(SwarmState swarmState) {
 
-        // do lots of other stuff?
+        // do lots of other stuff if we are indeed turning stuff off, or going to endgame
 
 
         this.swarmState = swarmState;
