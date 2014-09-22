@@ -42,34 +42,37 @@ public class OutputMessageStream extends MessageStream {
             // Does buffer have anything to be written
             if(bytesInWriteBuffer == 0) {
 
-                // Clear buffer: pos = 0, lim = cap, mark discarded
-                buffer.clear();
-
-                // If we still have messages to write, then fill buffer
+                // No, then if we still have messages to write, put in buffer
                 if(!queue.isEmpty()) {
 
                     // Get message
                     MessageWithLengthField m = queue.poll();
 
-                    // Is there space in buffer? otherwise throw exceptions
+                    // Is there space in buffer?
                     int messageLength = m.getRawMessageLength();
+
+                    // otherwise throw exception
                     if(messageLength > BUFFER_SIZE)
                         throw new MessageToLargeForNetworkBufferException(messageLength, BUFFER_SIZE);
-                    else
-                        bytesInWriteBuffer = messageLength; // buffer will be filled with message
 
                     // Write raw message into network buffer
                     m.writeMessageToBuffer(buffer);
 
+                    // Buffer was filled with full message
+                    bytesInWriteBuffer = messageLength;
+
                     // Write buffer to socket
-                    buffer.flip(); // make limit= position and position = 0, to facilitate writing into socket
-                    numberOfBytesWritten = channel.write(buffer);
+                    // removed from first line after if: buffer.clear();  // Clear buffer: pos = 0, lim = cap, mark discarded
+                    //buffer.flip(); // make limit= position and position = 0, to facilitate writing into socket
+                    //numberOfBytesWritten = channel.write(buffer);
+                    buffer.clear(); // pos = 0, lim=cap
+                    numberOfBytesWritten = write(bytesInWriteBuffer);
 
-                } else
-                    numberOfBytesWritten = 0; // otherwise we are done
+                } else // Otherwise we are done
+                    numberOfBytesWritten = 0;
 
-            } else
-                numberOfBytesWritten = channel.write(buffer); // write what is in buffer to socket
+            } else // Write, and note number of bytes written from buffer to socket
+                numberOfBytesWritten = write(bytesInWriteBuffer);
 
             if(numberOfBytesWritten > 0);
             // log data sent
@@ -79,6 +82,29 @@ public class OutputMessageStream extends MessageStream {
 
         } while(numberOfBytesWritten > 0); // We are done for now if we can't write to socket right now
 
+        return numberOfBytesWritten;
+    }
+
+    /**
+     * Writes from buffer into socket channel
+     * starting at present position
+     * while respecting present transmission limit,
+     * and noting how much was written.
+     * @return number of bytes written
+     * @throws IOException
+     */
+    protected int write(int upperLimit) throws IOException {
+
+        // Prepare for transmission by updating limit on buffer
+        updateTransmissionLimit(upperLimit);
+
+        // Perform writing
+        int numberOfBytesWritten = channel.write(buffer);
+
+        // Notify manager of quantity written
+        transmittedData(numberOfBytesWritten);
+
+        // and return quantity to caller
         return numberOfBytesWritten;
     }
 }

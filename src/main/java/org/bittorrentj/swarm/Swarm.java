@@ -23,7 +23,6 @@ import org.bittorrentj.torrent.MetaInfo;
  */
 public class Swarm extends Thread {
 
-
     /**
      * Control state given by client of this swarm.
      * ON corresponds to an effort to download the torrent,
@@ -274,14 +273,12 @@ public class Swarm extends Thread {
 
         // called from process*Network, but perhaps also from Client
         // in response to command, figure this out, and whether we need
-        // synching. this informs whetehr routine should be public or private
+        // synchronizing. this informs whether routine should be public or private
 
 
         // actually close connection.close -> what does this do with selector?
         // remove from connections hashmap
         // what to do about various buffer is in connection, and also in diskmanager?
-
-
 
     }
 

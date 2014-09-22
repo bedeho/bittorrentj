@@ -12,6 +12,7 @@ import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundExcepti
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.stream.InputMessageStream;
 import org.bittorrentj.message.stream.OutputMessageStream;
+import org.bittorrentj.swarm.exception.ExtendedMessageReceivedWithoutEnabling;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -169,7 +170,7 @@ public class Connection {
             UnsupportedExtendedMessageFoundException,
             ReceivedBitFieldMoreThanOnce,
             InvalidPieceIndexInHaveMessage,
-            InvalidBitFieldMessage {
+            InvalidBitFieldMessage, ExtendedMessageReceivedWithoutEnabling {
 
         /**
          * Does it have id?, if not, then its just a keep-alive message,
@@ -304,6 +305,9 @@ public class Connection {
 
                     break;
                 case EXTENDED: // Peer sent a BEP10 extended message
+
+                    if(!clientState.extensionProtocolIsUsed())
+                        throw new ExtendedMessageReceivedWithoutEnabling();
 
                     Extended extendedMessage = (Extended)m;
 
