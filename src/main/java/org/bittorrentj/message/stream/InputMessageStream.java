@@ -1,7 +1,7 @@
 package org.bittorrentj.message.stream;
 
 import org.bittorrentj.exceptions.InvalidMessageReceivedException;
-import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
+import org.bittorrentj.swarm.exception.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.MessageWithLengthField;
 
@@ -58,16 +58,8 @@ public class InputMessageStream extends MessageStream {
      */
     public int read(LinkedList<MessageWithLengthField> queue) throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException  {
 
-        // How much can be read at most at present
-        int maxBytesToRead = manager.maximumTransmittableDataAtThisTime();
-
-        // Set limit of buffer to respect this
-
-        // The number of bytes read from socket into buffer
-        int numberOfBytesRead = channel.read(buffer);
-
-        // Remove limit
-
+        // Read, and note number of bytes read from socket into buffer
+        int numberOfBytesRead = read();
 
         // Note where in buffer data ends
         int endPositionOfDataInReadBuffer = buffer.position();
@@ -101,14 +93,14 @@ public class InputMessageStream extends MessageStream {
                 throw new MessageToLargeForNetworkBufferException(totalMessageSize, BUFFER_SIZE);
 
             /**
-             * Check that buffer does contain a full new message,
-             * that is: <length><id><payload>.
+             * Check that buffer does contain a full new message, that is: <length><id><payload>.
              * if not we are done reading from buffer, and we stop without
              * advancing buffer read position.
              */
             if (numberOfUnconsumedBytes >= totalMessageSize) {
 
-                // Wrap in a temporary read only buffer
+                // Wrap in a temporary read only buffer.
+                // NB: underlying buffer array is NOT duplicated, thats the point!
                 ByteBuffer temporaryBuffer = buffer.duplicate().asReadOnlyBuffer();
 
                 // and make sure this buffer starts where message starts
@@ -140,7 +132,7 @@ public class InputMessageStream extends MessageStream {
         if (numberOfUnconsumedBytes == 0) {
             buffer.clear();
             startPositionOfDataInReadBuffer = 0;
-        } else if (!buffer.hasRemaining()) {
+        } else if (endPositionOfDataInReadBuffer == buffer.capacity()-1) {
 
             // If unconsumed data touches buffer limit,
             // then copy to the front of the buffer.
@@ -162,10 +154,30 @@ public class InputMessageStream extends MessageStream {
         // log bytes written
         // if(numberOfBytesRead > 0);
 
-        // Notify manager
-        manager.transmittedData(numberOfBytesRead);
-
         // Return how much was read
+        return numberOfBytesRead;
+    }
+
+    /**
+     * Reads from the socket channel into buffer
+     * starting at present position
+     * while respecting present transmission limit,
+     * and noting how much was read.
+     * @return number of bytes read
+     * @throws IOException
+     */
+    private int read() throws IOException {
+
+        // Prepare for transmission by updating limit on buffer
+        updateTransmissionLimit();
+
+        // Perform reading
+        int numberOfBytesRead = channel.read(buffer);
+
+        // Notify manager of quantity read
+        transmittedData(numberOfBytesRead);
+
+        // and return quantity to caller
         return numberOfBytesRead;
     }
 }

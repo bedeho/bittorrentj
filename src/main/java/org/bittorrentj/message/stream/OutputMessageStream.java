@@ -1,6 +1,6 @@
 package org.bittorrentj.message.stream;
 
-import org.bittorrentj.exceptions.MessageToLargeForNetworkBufferException;
+import org.bittorrentj.swarm.exception.MessageToLargeForNetworkBufferException;
 import org.bittorrentj.message.MessageWithLengthField;
 
 import java.io.IOException;

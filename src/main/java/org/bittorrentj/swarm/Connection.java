@@ -12,7 +12,7 @@ import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundExcepti
 import org.bittorrentj.message.field.MessageId;
 import org.bittorrentj.message.stream.InputMessageStream;
 import org.bittorrentj.message.stream.OutputMessageStream;
-import org.bittorrentj.swarm.exception.ExtendedMessageReceivedWithoutEnabling;
+import org.bittorrentj.swarm.exception.*;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -26,7 +26,7 @@ public class Connection {
     /**
      * Swarm to which this connection belongs.
      */
-    private Swarm swarm;
+    //private Swarm swarm;
 
     /**
      * State of client side of connection.
@@ -113,6 +113,7 @@ public class Connection {
         this.peerState = peerState;
         this.outputStream = outputStream;
         this.inputStream = inputStream;
+        this.validPieceDownloadCounter = 0;
         this.activeClientExtensions = activeClientExtensions;
         this.receivedBitField = null;
         this.readMessagesQueue = new LinkedList<MessageWithLengthField>();
@@ -154,7 +155,12 @@ public class Connection {
         outputStream.write(writeMessagesQueue);
     }
 
-    public void processReadMessageQueue() throws InvalidBitFieldMessage, ReceivedBitFieldMoreThanOnce, InvalidPieceIndexInHaveMessage, UnsupportedExtendedMessageFoundException {
+    public void processReadMessageQueue() throws
+            InvalidBitFieldMessage,
+            ReceivedBitFieldMoreThanOnce,
+            InvalidPieceIndexInHaveMessage,
+            UnsupportedExtendedMessageFoundException,
+            ExtendedMessageReceivedWithoutEnabling {
 
         // Process new message
         MessageWithLengthField m;
@@ -166,6 +172,8 @@ public class Connection {
      * Process the advent of the given message on the given connection
      * @param m message
      */
+
+    // I SUSPECT THIS NEEDS TO BE MOVED BACK INTO SWARM....
     private void processMessage(MessageWithLengthField m) throws
             UnsupportedExtendedMessageFoundException,
             ReceivedBitFieldMoreThanOnce,
@@ -281,15 +289,15 @@ public class Connection {
 
                     int sizeOfNewData = swarm.sizeOfBlockWeDoNotHave(pieceMessage.getIndex(), pieceMessage.getBegin() , pieceMessage.getBlock().length);
 
+                    // Did we actually get any fresh data?
                     if(sizeOfNewData > 0) {
 
                         // Add the new part as part of download counter
                         validPieceDownloadCounter += sizeOfNewData;
 
-
-
+                        // Process piece: save, send out cancelations etc.
+                        swarm.processNewPieceMessage(pieceMessage);
                     }
-
 
                     break;
                 case CANCEL: // Peer wants to cancel a previous request

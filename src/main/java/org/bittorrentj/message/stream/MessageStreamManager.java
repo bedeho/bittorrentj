@@ -53,6 +53,12 @@ public class MessageStreamManager {
     private int desiredTransmissionRate;
 
     /**
+     * Represents whether transmission rate management
+     * is enabled at present.
+     */
+    private boolean isRateManagementEnabled;
+
+    /**
      * Constructor
      * @param desiredTransmissionRate
      */
@@ -64,6 +70,7 @@ public class MessageStreamManager {
         this.desiredTransmissionRate = desiredTransmissionRate;
         this.transmittedDataInPresentWindow = 0;
         this.currentWindowStart = startTime;
+        this.isRateManagementEnabled = false;
     }
 
     /**
@@ -151,5 +158,13 @@ public class MessageStreamManager {
 
     public Date getStartTime() {
         return startTime;
+    }
+
+    public boolean isRateManagementEnabled() {
+        return isRateManagementEnabled;
+    }
+
+    public void setRateManagementEnabled(boolean isRateManagementEnabled) {
+        this.isRateManagementEnabled = isRateManagementEnabled;
     }
 }

@@ -7,6 +7,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 
 import org.bittorrentj.Client;
 import org.bittorrentj.event.ClientIOFailedEvent;
@@ -16,6 +17,7 @@ import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
+import org.bittorrentj.swarm.exception.*;
 import org.bittorrentj.torrent.MetaInfo;
 
 /**
@@ -37,6 +39,30 @@ public class Swarm extends Thread {
     private SwarmState swarmState;
 
     /**
+     * When the swarm seeds, it can either limit itself
+     * to only seeding pieces in response to
+     * specific request messages received from peers (PASSIVE),
+     * or to also
+     */
+    public enum SeedingPolicy {
+        PASSIVE, ACTIVE;
+    }
+
+    /**
+     * When swarm leeches it picks
+     *
+     * , it can pick
+     * the next piece among the peers which are
+     * presently unchoking it to be the
+     * RAREST_FIRST: most rare piece to be full among ALL peers,
+     * STREAMING: piece with lowest piece index among all its incomplete pieces
+     * RANDOM: a random piec
+     */
+    public enum LeechPolicy {
+        RAREST_FIRST, STREAMING, RANDOM;
+    }
+
+    /**
      * Multiplexing selector for swarm connectivity
      */
     private Selector selector;
@@ -50,16 +76,27 @@ public class Swarm extends Thread {
      * Torrent file meta information
      */
     private MetaInfo metaInformation;
-
+0
     /**
      * Client object this swarm belongs to
      */
     private Client client;
 
     /**
+     * All open connections in this swarm
+     */
+    private LinkedList<Connection> connections;
+
+    /**
      * Maps IP:Port string to corresponding connection
      */
-    private HashMap<InetSocketAddress, Connection> connections;
+    private HashMap<InetSocketAddress, Connection> connectionLookupTable;
+
+    /**
+     * List of known peers in this swarm.
+     * This list is filled by ... (dht,tracker list, pex,..)
+     */
+    private LinkedList<InetSocketAddress> knownPeers;
 
     /**
      * There maximum number of connections allowed for this torrent swarm
@@ -127,6 +164,8 @@ public class Swarm extends Thread {
             readAndWriteMessages();
 
 
+
+
             // choking algorithm, and optimistic unchoking
             updateChokingState();
 
@@ -172,30 +211,8 @@ public class Swarm extends Thread {
             try {
 
                 // Read from channel if ready
-                if (key.isReadable()) {
+                if (key.isReadable())
                     connection.readMessagesFromChannel();
-
-                    // Process message queue just populated
-                    try {
-                        connection.processReadMessageQueue();
-                    } catch (UnsupportedExtendedMessageFoundException e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    } catch (ReceivedBitFieldMoreThanOnce e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    } catch (InvalidPieceIndexInHaveMessage e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    } catch (InvalidBitFieldMessage e) {
-                        closeConnection(connection);
-                        //return;
-                        // or just ignore ?
-                    }
-                }
 
                 // Write to channel if ready
                 if (key.isWritable())
@@ -218,6 +235,34 @@ public class Swarm extends Thread {
         }
     }
 
+    private void processReadMessages() {
+
+        // Process message queue just populated
+        try {
+            connection.processReadMessageQueue();
+        } catch (UnsupportedExtendedMessageFoundException e) {
+            closeConnection(connection);
+            //return;
+            // or just ignore ?
+        } catch (ReceivedBitFieldMoreThanOnce e) {
+            closeConnection(connection);
+            //return;
+            // or just ignore ?
+        } catch (InvalidPieceIndexInHaveMessage e) {
+            closeConnection(connection);
+            //return;
+            // or just ignore ?
+        } catch (InvalidBitFieldMessage e) {
+            closeConnection(connection);
+            //return;
+            // or just ignore ?
+        } catch (ExtendedMessageReceivedWithoutEnabling e) {
+            closeConnection(connection);
+            //return;
+            // or just ignore ?
+        }
+    }
+
     private void updateChokingState() {
 
         // stop downloading pieces from someone who is just super slow,or who did not respond to our request?
@@ -225,6 +270,8 @@ public class Swarm extends Thread {
     }
 
     private void requestPieces() {
+
+
 
     }
 
@@ -269,7 +316,7 @@ public class Swarm extends Thread {
      *
      * @param connection
      */
-    synchronized public void closeConnection(Connection connection) {
+    public void closeConnection(Connection connection) {
 
         // called from process*Network, but perhaps also from Client
         // in response to command, figure this out, and whether we need
@@ -286,7 +333,7 @@ public class Swarm extends Thread {
      * Number of connections in swarm at present
      * @return
      */
-    synchronized public int getNumberOfPeers() {
+    public int getNumberOfPeers() {
         return connections.size();
     }
 
@@ -294,18 +341,20 @@ public class Swarm extends Thread {
      * Indicates whether this swarm accepts more connections
      * @return
      */
-    synchronized public boolean acceptsMoreConnections() {
+    public boolean acceptsMoreConnections() {
         return connections.size() > maxNumberOfConnections;
     }
 
     /**
      *
      */
-    synchronized public void addConnection(SocketChannel channel, Handshake m) {
+    public void addConnection(SocketChannel channel, Handshake m) {
 
         //register channel with selector with both opread and opwrite
 
         // new connection (PeerState clientState, PeerState peerState, HashMap<Integer, Extension> activeClientExtensions)
+
+        // add to connections, and to connectionLookupTable
 
         /*
         public synchronized addPeer(socket, peer_id, reserved) : for when a peer connects and gives you all this info :called by, at thisp point the peer
@@ -321,7 +370,7 @@ public class Swarm extends Thread {
      *
      * @return
      */
-    synchronized public void getConnections() {
+    public void getConnections() {
 
     }
 
@@ -336,7 +385,7 @@ public class Swarm extends Thread {
     /**
      *
      */
-    synchronized public void removeConnection(InetSocketAddress address) {
+    public void removeConnection(InetSocketAddress address) {
         // complicated
     }
 
@@ -356,6 +405,21 @@ public class Swarm extends Thread {
     public boolean isMetaInformationKnown() { return metaInformation != null;}
 
     public int sizeOfBlockWeDoNotHave(int begin, int block, int length) {
+
+    }
+
+    public void processNewPieceMessage(Piece m) {
+
+        // save to disk
+
+        // Iterate all connections, and remove all outstanding
+        // requests which are now satisfied with this new piece.
+        // e.g. if we were in end game mode this would be important,
+        // but also otherwise
+
+        // switch into end game mode, and send requess to everyone
+
+        // if this was last, then switch out of end game mode, if we were in it
 
     }
 
