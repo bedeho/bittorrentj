@@ -1,6 +1,6 @@
 package org.bittorrentj.extension;
 
-import org.bittorrentj.swarm.connection.Connection;
+import org.bittorrentj.swarm.Connection;
 import org.bittorrentj.bencodej.BencodeableDictionary;
 import org.bittorrentj.message.Extended;
 

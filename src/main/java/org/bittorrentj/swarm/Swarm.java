@@ -16,7 +16,6 @@ import org.bittorrentj.extension.Extension;
 import org.bittorrentj.message.*;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.Hash;
-import org.bittorrentj.swarm.connection.Connection;
 import org.bittorrentj.torrent.MetaInfo;
 
 /**

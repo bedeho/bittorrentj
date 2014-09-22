@@ -1,4 +1,4 @@
-package org.bittorrentj.swarm.connection;
+package org.bittorrentj.swarm;
 
 import org.bittorrentj.bencodej.BencodableByteString;
 import org.bittorrentj.bencodej.BencodeableDictionary;
@@ -10,10 +10,10 @@ import org.bittorrentj.message.exceptions.MalformedMDictionaryException;
 import org.bittorrentj.message.exceptions.PayloadDoesNotContainMDictionaryException;
 import org.bittorrentj.message.exceptions.UnsupportedExtendedMessageFoundException;
 import org.bittorrentj.message.field.MessageId;
-import org.bittorrentj.swarm.Swarm;
+import org.bittorrentj.message.stream.InputMessageStream;
+import org.bittorrentj.message.stream.OutputMessageStream;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
 
@@ -48,8 +48,13 @@ public class Connection {
      * Stream used to asynchronously read and write messages
      * to channel.
      */
-    private InputMessageStream stream;
+    private InputMessageStream inputStream;
 
+    /**
+     * Stream used to asynchronously read and write messages
+     * to channel.
+     */
+    private OutputMessageStream outputStream;
 
     /**
      * Counts the amount of data received in piece messages
@@ -62,43 +67,6 @@ public class Connection {
      * and pieces we don't need.
      */
     private int validPieceDownloadCounter;
-
-
-
-
-
-    /**
-     * Write buffer for network
-     */
-    private ByteBuffer networkWriteBuffer;
-
-    /**
-     * Size (bytes) of networkWriteBuffer
-     */
-    private final static int NETWORK_WRITE_BUFFER_SIZE = 10 * 1024 * 1024;
-
-    /**
-     * Counts the amount of raw data written into the network write buffer
-     * within present averaging window.
-     */
-    private int rawUploadCounter;
-
-    /**
-     * The number of bytes in the write buffer.
-     * We cannot use hasRemaining on buffer, since that
-     * can also be state when buffer is perfectly empty.
-     */
-    private int bytesInWriteBuffer;
-
-
-
-
-
-
-
-
-
-
 
     /**
      * Queue of messages which have been read but not processed
@@ -127,24 +95,27 @@ public class Connection {
 
     /**
      * Constructor
+     * @param swarm
+     * @param clientState
+     * @param peerState
+     * @param inputStream
+     * @param outputStream
+     * @param activeClientExtensions
+     * @throws DuplicateExtensionNameInMDictionaryException
+     * @throws PayloadDoesNotContainMDictionaryException
+     * @throws MalformedMDictionaryException
      */
-    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, InputMessageStream stream, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
+    public Connection(Swarm swarm, PeerState clientState, PeerState peerState, InputMessageStream inputStream, OutputMessageStream outputStream, HashMap<Integer, Extension> activeClientExtensions) throws DuplicateExtensionNameInMDictionaryException, PayloadDoesNotContainMDictionaryException, MalformedMDictionaryException {
 
         this.swarm = swarm;
         this.clientState = clientState;
         this.peerState = peerState;
-        this.stream = stream;
-
+        this.outputStream = outputStream;
+        this.inputStream = inputStream;
         this.activeClientExtensions = activeClientExtensions;
-
         this.receivedBitField = null;
-
-        this.networkWriteBuffer = ByteBuffer.allocateDirect(NETWORK_WRITE_BUFFER_SIZE);
-
         this.readMessagesQueue = new LinkedList<MessageWithLengthField>();
         this.writeMessagesQueue = new LinkedList<MessageWithLengthField>();
-
-        this.bytesInWriteBuffer = 0;
 
         /**
          * If we have knowledge about piece availability, e.g. because
@@ -153,7 +124,7 @@ public class Connection {
         if(clientState.isPieceAvailabilityKnown())
             enqueueMessageForSending(new BitField(clientState.getAdvertisedPieceAvailability()));
 
-        // ALTER LOGIC SO THAT MESSAGE PARSING RESPECTS WHETHER CLIENT SIDE OF CONNECTION ACTUALY HAS bep10 ENABLED.
+        // ALTER LOGIC SO THAT MESSAGE PARSING RESPECTS WHETHER CLIENT SIDE OF CONNECTION ACTUALLY HAS bep10 ENABLED.
 
         /**
          * If both client and peer support BEP10, then we also send extended handshake.
@@ -172,60 +143,14 @@ public class Connection {
      * Is called when OP_READ is registered with channel and put full messages in readMessagesQueue.
      */
     public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
-        stream.read(readMessagesQueue);
+        inputStream.read(readMessagesQueue);
     }
 
     /**
-     * Attempts to write to channel when OP_WRITE is registered,
-     * by writing messages from writeMessagesQueue.
+     * Is called when OP_WRITE is registered with channel and write messages from writeMessagesQueue.
      */
     public void writeMessagesToChannel() throws IOException, MessageToLargeForNetworkBufferException {
-
-        // The number of bytes written into socket from write buffer in last iteration of next loop
-        int numberOfBytesWritten = 0;
-
-        do {
-
-            // Does buffer have anything to be written
-            if(bytesInWriteBuffer == 0) {
-
-                // Clear buffer: pos = 0, lim = cap, mark discarded
-                networkWriteBuffer.clear();
-
-                // If we still have messages to write, then fill buffer
-                if(!writeMessagesQueue.isEmpty()) {
-
-                    // Get message
-                    MessageWithLengthField m = writeMessagesQueue.poll();
-
-                    // Is there space in buffer? otherwise throw exceptions
-                    int messageLength = m.getRawMessageLength();
-                    if(messageLength > NETWORK_WRITE_BUFFER_SIZE)
-                        throw new MessageToLargeForNetworkBufferException(messageLength, NETWORK_WRITE_BUFFER_SIZE);
-                    else
-                        bytesInWriteBuffer = messageLength; // buffer will be filled with message
-
-                    // Write raw message into network buffer
-                    m.writeMessageToBuffer(networkWriteBuffer);
-
-                    // Write buffer to socket
-                    networkWriteBuffer.flip(); // make limit= position and position = 0, to facilitate writing into socket
-                    numberOfBytesWritten = channel.write(networkWriteBuffer);
-
-                } else
-                    numberOfBytesWritten = 0; // otherwise we are done
-
-            } else
-                numberOfBytesWritten = channel.write(networkWriteBuffer); // write what is in buffer to socket
-
-            if(numberOfBytesWritten > 0);
-                // log data sent
-
-            // Update number of bytes in buffer
-            bytesInWriteBuffer -= numberOfBytesWritten;
-
-        } while(numberOfBytesWritten > 0); // We are done for now if we can't write to socket right now
-
+        outputStream.write(writeMessagesQueue);
     }
 
     public void processReadMessageQueue() throws InvalidBitFieldMessage, ReceivedBitFieldMoreThanOnce, InvalidPieceIndexInHaveMessage, UnsupportedExtendedMessageFoundException {

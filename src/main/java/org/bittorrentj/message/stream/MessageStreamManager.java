@@ -1,4 +1,4 @@
-package org.bittorrentj.swarm.connection;
+package org.bittorrentj.message.stream;
 
 import java.util.Date;
 
@@ -15,7 +15,7 @@ public class MessageStreamManager {
      * The size of the window used to measure network io (up/down) speed
      * over, in milliseconds.
      */
-    private final static int SPEED_MEASUREMENT_WINDOW_SIZE = 1000; // (ms)
+    public final static int SPEED_MEASUREMENT_WINDOW_SIZE = 1000; // (ms)
 
     /**
      * Time when manager when first started.
@@ -46,7 +46,7 @@ public class MessageStreamManager {
     private Date currentWindowStart;
 
     /**
-     * The rate (byte/ms) at which data is allowed
+     * The rate (b/ms) at which data is allowed
      * to be transmitted. The manager will attempt to get the rate
      * as close as possible, but not above.
      */
@@ -62,20 +62,36 @@ public class MessageStreamManager {
         this.totalAmountOfTransmittedData = 0;
         this.timeLastDataTransmitted = null;
         this.desiredTransmissionRate = desiredTransmissionRate;
-
-        startNewWindowIfNecessary();
+        this.transmittedDataInPresentWindow = 0;
+        this.currentWindowStart = startTime;
     }
 
     /**
-     * 
+     * How much may be transmitted at present time
      * @return
      */
+    //public int maximumTransmittableDataAtThisTime() {
     public int maximumTransmittableDataAtThisTime() {
 
+        // Start a new measuring window if necessary
+        startNewWindowIfNecessary();
+
+        // Has the maximum amount been transmitted this window
+        int maximumAmountPerWindow = desiredTransmissionRate * SPEED_MEASUREMENT_WINDOW_SIZE;
+
+        // BOOLEAN: yes/no
+        // if so then return true iff we have not used up quota
+        //return transmittedDataInPresentWindow < maximumAmountPerWindow;
+
+        // INTEGER CAPPED: assumes it is called at least once per window
+        // if so then return true iff we have not used up quota
+        int remaining = transmittedDataInPresentWindow - maximumAmountPerWindow;
+        return remaining > 0 ? remaining : 0;
     }
 
     /**
-     *
+     * Registers that data has been transmitted,
+     * is called from streams.
      * @param numberOfBytes
      */
     public void transmittedData(int numberOfBytes) {
@@ -94,16 +110,28 @@ public class MessageStreamManager {
     }
 
     /**
-     *
-     * @return
+     * Resets the starting time of the present window, and resets counter,
+     * both only if current time has exceeded measuring window.
+     * @return present starting date for window
      */
     private Date startNewWindowIfNecessary() {
 
-        Date now = new Date();
+        long now = new Date().getTime();
 
-        if(currentWindowStart == null || now.getTime() - currentWindowStart.getTime() > SPEED_MEASUREMENT_WINDOW_SIZE) {
+        // Time since start of the last measuring window
+        long timeSinceLastWindowStart = now - currentWindowStart.getTime();
+
+        // Has more than one interval passed, if so we must reset window start time and counter
+        if(timeSinceLastWindowStart > SPEED_MEASUREMENT_WINDOW_SIZE) {
+
+            // Get overflow of passed time
+            long overflow = timeSinceLastWindowStart % SPEED_MEASUREMENT_WINDOW_SIZE;
+
+            // Set time to be -overflow in the past
+            this.currentWindowStart.setTime(now - overflow);
+
+            // Reset transmission counter
             this.transmittedDataInPresentWindow = 0;
-            this.currentWindowStart = now;
         }
 
         return currentWindowStart;

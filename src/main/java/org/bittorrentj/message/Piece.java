@@ -1,6 +1,6 @@
 package org.bittorrentj.message;
 
-import org.bittorrentj.swarm.connection.Connection;
+import org.bittorrentj.swarm.Connection;
 import org.bittorrentj.message.exceptions.BlockLengthIsToShortException;
 import org.bittorrentj.message.exceptions.BlockLengthToLargeException;
 import org.bittorrentj.message.exceptions.NonMatchingIdFieldException;

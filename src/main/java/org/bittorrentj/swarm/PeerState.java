@@ -1,4 +1,4 @@
-package org.bittorrentj.swarm.connection;
+package org.bittorrentj.swarm;
 
 /**
  * Created by bedeho on 15.09.2014.
