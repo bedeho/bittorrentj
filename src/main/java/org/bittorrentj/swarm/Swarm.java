@@ -6,8 +6,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Set;
 
 import org.bittorrentj.Client;
 import org.bittorrentj.event.ClientIOFailedEvent;
@@ -39,16 +39,6 @@ public class Swarm extends Thread {
     private SwarmState swarmState;
 
     /**
-     * When the swarm seeds, it can either limit itself
-     * to only seeding pieces in response to
-     * specific request messages received from peers (PASSIVE),
-     * or to also
-     */
-    public enum SeedingPolicy {
-        PASSIVE, ACTIVE;
-    }
-
-    /**
      * When swarm leeches it picks
      *
      * , it can pick
@@ -56,7 +46,7 @@ public class Swarm extends Thread {
      * presently unchoking it to be the
      * RAREST_FIRST: most rare piece to be full among ALL peers,
      * STREAMING: piece with lowest piece index among all its incomplete pieces
-     * RANDOM: a random piec
+     * RANDOM: a random piece
      */
     public enum LeechPolicy {
         RAREST_FIRST, STREAMING, RANDOM;
@@ -76,7 +66,7 @@ public class Swarm extends Thread {
      * Torrent file meta information
      */
     private MetaInfo metaInformation;
-0
+
     /**
      * Client object this swarm belongs to
      */
@@ -136,6 +126,13 @@ public class Swarm extends Thread {
      */
     private final static int KEEP_ALIVE_INTERVAL = 60*1000;
 
+    /**
+     *
+     * @param infoHash
+     * @param metaInformation
+     * @param activeClientExtensions
+     * @param swarmState
+     */
     public Swarm(Hash infoHash, MetaInfo metaInformation, HashMap<Integer, Extension> activeClientExtensions, SwarmState swarmState) {
 
         this.infoHash = infoHash;
@@ -155,23 +152,76 @@ public class Swarm extends Thread {
 
         while(true) {
 
-            // how to stop???
+            // We may have been paused by client, if so we go to sleep
+            goToSleepIfPaused();
 
-            // Think about the order of the processing below
-            // Also perhaps refactor them some more to make them bemore testable and have more precise/stateless behaviour.
+            // Try to select some keys in the selector if possible
+            int numberOfUpdatedKeys = selectUpdatedKeys(Client.MAX_SELECTOR_DELAY);
+
+            // if there were some selected keys, then we attempt to read/write
+            if(numberOfUpdatedKeys > 0) {
+
+                LinkedList<Connection> writtenTo, readFrom;
+
+                Set<SelectionKey> selectedKeys = selector.selectedKeys();
+
+                try {
+                    writtenTo = writeMessagesToSocketChannels(selectedKeys);
+                    readFrom = readMessagesFromSocketChannels(selectedKeys);
+                } catch (IOException e) {
+                    // Notify client
+                    sendEvent(new ClientIOFailedEvent(e));
+                    // closeConnection(connection); ????
+                } catch (MessageToLargeForNetworkBufferException e) {
+                    // closeConnection(connection); ????
+                } catch (InvalidMessageReceivedException e) {
+
+                }
+
+                // Clear all selected keys from selector
+                selectedKeys.clear();
+
+                // Process any read messages
+                if(readFrom != null) {
+                    for (Connection c : readFrom) {
+
+                        // Process message queue just populated
+                        try {
+                            c.processReadMessageQueue();
+                        } catch (UnsupportedExtendedMessageFoundException e) {
+                            closeConnection(c);
+                            //return;
+                            // or just ignore ?
+                        } catch (ReceivedBitFieldMoreThanOnce e) {
+                            closeConnection(c);
+                            //return;
+                            // or just ignore ?
+                        } catch (InvalidPieceIndexInHaveMessage e) {
+                            closeConnection(c);
+                            //return;
+                            // or just ignore ?
+                        } catch (InvalidBitFieldMessage e) {
+                            closeConnection(c);
+                            //return;
+                            // or just ignore ?
+                        } catch (ExtendedMessageReceivedWithoutEnabling e) {
+                            closeConnection(c);
+                            //return;
+                            // or just ignore ?
+                        }
+
+                    }
+                }
+            }
+
+            // Implement choking algorithm
+            LinkedList<Connection> unchokedConnections = updateChokingState();
 
             //
-            readAndWriteMessages();
-
-
-
-
-            // choking algorithm, and optimistic unchoking
-            updateChokingState();
-
-            requestPieces();
-
-            sendPieces();
+            for(Connection c: unchokedConnections) {
+                c.requestPieces();
+                c.sendPieces();
+            }
 
             // extension processing called as well
             processExtensions();
@@ -181,89 +231,104 @@ public class Swarm extends Thread {
         }
     }
 
-    /**
-     *
-     */
-    private void readAndWriteMessages() {
+    private void goToSleepIfPaused() {
 
-        // Get next channel event
-        int numberOfUpdatedKeys = 0;
+    }
+
+    public void kill() {
+
+    }
+
+    /**
+     * Attempt to select keys on selector.
+     * @param maxDuration maximum number of milliseconds to block for a selection.
+     * @return number of selected keys.
+     */
+    private int selectUpdatedKeys(long maxDuration) {
+
+        int numberOfSelectedKeys;
 
         try {
-            numberOfUpdatedKeys = selector.select(Client.MAX_SELECTOR_DELAY);
+            numberOfSelectedKeys = selector.select(maxDuration);
         } catch(IOException e) {
             System.out.println("what can causes us to come here????"); // <= logg later in log4j
+            return 0; // do this?
         }
 
-        // Iterate keys and process read/write events
-        Iterator i = selector.selectedKeys().iterator();
+        return numberOfSelectedKeys;
+    }
 
-        while (i.hasNext()) {
+    /**
+     * Attempts to write to all connections
+     * for which the corresponding socket channel had a
+     * OP_WRITE event associated with its selector key.
+     * A list of connection to which at least one byte could
+     * be written is returned.
+     * @return list of connections to which at least one byte was written.
+     */
+    LinkedList<Connection> writeMessagesToSocketChannels(Set<SelectionKey> selectedKeys) throws IOException, MessageToLargeForNetworkBufferException {
 
-            SelectionKey key = (SelectionKey) i.next();
+        // List of connections to which at least one byte was written
+        LinkedList<Connection> writtenTo = new LinkedList<Connection>();
 
-            // Get connection
-            Connection connection = (Connection)key.attachment();
+        // Iterate keys and process OP_WRITE events
+        for(SelectionKey key: selectedKeys) {
 
-            // Remove key from selected key set
-            selector.selectedKeys().remove(key);
+            // Write to channel if ready
+            if (key.isWritable()) {
 
-            try {
+                // Get connection
+                Connection connection = (Connection)key.attachment();
 
-                // Read from channel if ready
-                if (key.isReadable())
-                    connection.readMessagesFromChannel();
+                // Attempt to write to channel
+                int numberOfBytesWritten = connection.writeMessagesToChannel();
 
-                // Write to channel if ready
-                if (key.isWritable())
-                    connection.writeMessagesToChannel();
-
-            } catch (IOException e) {
-                // Notify client
-                sendEvent(new ClientIOFailedEvent(e));
-
-                //// closeConnection(connection); ????
-
-            } catch (MessageToLargeForNetworkBufferException e) {
-                // ?
-            } catch (InvalidMessageReceivedException e) {
-                // ?
-            } finally {
-                // Close connection with this peer
-                closeConnection(connection);
+                // and save to list if we managed to write something
+                if(numberOfBytesWritten > 0)
+                    writtenTo.add(connection);
             }
+
         }
+
+        return writtenTo;
     }
 
-    private void processReadMessages() {
+    /**
+     * Attempts to read from all connections
+     * for which the corresponding socket channel had a
+     * OP_RED event associated with its selector key.
+     * A list of connections from which at least one byte could
+     * be read is returned.
+     * @return list of connections from which at least one byte was read.
+     */
+    LinkedList<Connection> readMessagesFromSocketChannels(Set<SelectionKey> selectedKeys) throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
 
-        // Process message queue just populated
-        try {
-            connection.processReadMessageQueue();
-        } catch (UnsupportedExtendedMessageFoundException e) {
-            closeConnection(connection);
-            //return;
-            // or just ignore ?
-        } catch (ReceivedBitFieldMoreThanOnce e) {
-            closeConnection(connection);
-            //return;
-            // or just ignore ?
-        } catch (InvalidPieceIndexInHaveMessage e) {
-            closeConnection(connection);
-            //return;
-            // or just ignore ?
-        } catch (InvalidBitFieldMessage e) {
-            closeConnection(connection);
-            //return;
-            // or just ignore ?
-        } catch (ExtendedMessageReceivedWithoutEnabling e) {
-            closeConnection(connection);
-            //return;
-            // or just ignore ?
+        // List of connections from which at least one byte was read
+        LinkedList<Connection> readFrom = new LinkedList<Connection>();
+
+        // Iterate keys and process OP_READ events
+        for(SelectionKey key: selectedKeys) {
+
+            // Write to channel if ready
+            if (key.isReadable()) {
+
+                // Get connection
+                Connection connection = (Connection)key.attachment();
+
+                // Attempt to read from channel
+                int numberOfBytesRead = connection.readMessagesFromChannel();
+
+                // and save to list if we managed to write something
+                if(numberOfBytesRead > 0)
+                    readFrom.add(connection);
+            }
+
         }
+
+        return readFrom;
     }
 
-    private void updateChokingState() {
+    private LinkedList<Connection> updateChokingState() {
 
         // stop downloading pieces from someone who is just super slow,or who did not respond to our request?
 
@@ -285,11 +350,24 @@ public class Swarm extends Thread {
 
     }
 
+    /**
+     * Gives some running time for each extension in question
+     */
     private void processExtensions() {
 
+        for(Extension e: activeClientExtensions.values()) {
+            if(e.needsProcessing())
+                e.processing();
+        }
     }
 
     private void manageConnectivity() {
+
+        // send keep alive
+
+        // dosconnect form silent peers
+
+        // if we have to few peers, then try to connect to known peers, and if we know to few, ask to get more peers from somewhere.
 
         /**
          *

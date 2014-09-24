@@ -144,15 +144,15 @@ public class Connection {
     /**
      * Is called when OP_READ is registered with channel and put full messages in readMessagesQueue.
      */
-    public void readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
-        inputStream.read(readMessagesQueue);
+    public int readMessagesFromChannel() throws IOException, MessageToLargeForNetworkBufferException, InvalidMessageReceivedException {
+        return inputStream.read(readMessagesQueue);
     }
 
     /**
      * Is called when OP_WRITE is registered with channel and write messages from writeMessagesQueue.
      */
-    public void writeMessagesToChannel() throws IOException, MessageToLargeForNetworkBufferException {
-        outputStream.write(writeMessagesQueue);
+    public int writeMessagesToChannel() throws IOException, MessageToLargeForNetworkBufferException {
+        return outputStream.write(writeMessagesQueue);
     }
 
     public void processReadMessageQueue() throws

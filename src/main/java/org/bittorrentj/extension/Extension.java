@@ -40,7 +40,7 @@ public interface Extension {
 
     /**
      * Parses wire form of extended message for this extension.
-     * After successfull parsing the position of the buffer will be at the
+     * After successful parsing the position of the buffer will be at the
      * end of the message in the buffer.
      * @param src buffer.
      * @return message parsed.
@@ -53,4 +53,24 @@ public interface Extension {
      * @param c connection
      */
     public void init(Connection c);
+
+    /**
+     * This is a general processing callback which
+     * is called to allow the extension to do general
+     * processing unrelated to the arrivial of
+     * an extension message.
+     */
+    public void processing();
+
+    /**
+     * Indicates whether this extension should be called
+     * regularly to do general processing, unrelated
+     * to advent of new messages assigned to it. If this
+     * method returns false, then the process method will
+     * not be called, otherwise it will. Changing
+     * return value will change behaviour accordingly
+     * during a session.
+     * @return true iff processing should be done.
+     */
+    public boolean needsProcessing();
 }
