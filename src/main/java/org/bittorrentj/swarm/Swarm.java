@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Set;
@@ -70,7 +71,7 @@ public class Swarm extends Thread {
     /**
      * Client object this swarm belongs to
      */
-    private Client client;
+    //private Client client;
 
     /**
      * All open connections in this swarm
@@ -125,6 +126,45 @@ public class Swarm extends Thread {
      * This amount of time is generally two minutes.
      */
     private final static int KEEP_ALIVE_INTERVAL = 60*1000;
+
+    /**
+     * The last time (ms) the choking manager was called. Is
+     * used to keep track of whether choking manager should be
+     * called gain.
+     */
+    private Date lastChokeUpdate;
+
+    /**
+     * The greatest number of peers which are allowed to be
+     * unchoked at any given time.
+     */
+    private final int MAX_NUMBER_OF_UNCHOKED_PEERS = 4;
+
+    /**
+     * The last time (ms) an optimistic unchoke was performed. Is
+     * used to keep track of whether optimistic unchoking should be
+     * performed again.
+     */
+    private Date lastOptimisticChokingUpdate;
+
+    /**
+     * The greatest number of peers which are allowed to be
+     * unchoked at any given time.
+     */
+    private final int MAX_NUMBER_OF_OPTIMISTICALLY_UNCHOKED_PEERS = 1;
+
+    /**
+     * The duration (ms) between each time choking state is
+     * updated by calling the choking manager. The
+     * standard value is 10s.
+     */
+    private final int CHOKING_MANAGEMENT_PERIODE = 10*1000;
+
+    /**
+     * The duration (ms) between each time optimistic unchoking is attempted.
+     * The standard value is 30s.
+     */
+    private final int OPTIMISTIC_UNCHOKING_MANAGEMENT_PERIODE = 30*1000;
 
     /**
      *
@@ -214,20 +254,22 @@ public class Swarm extends Thread {
                 }
             }
 
-            // Implement choking algorithm
-            LinkedList<Connection> unchokedConnections = updateChokingState();
+            // Run choking algorithm
+            LinkedList<Connection> unchokedConnections = chokingAlgorithm();
 
-            //
+            // Iterate unchoked connections, and send requests and pieces
             for(Connection c: unchokedConnections) {
                 c.requestPieces();
                 c.sendPieces();
             }
 
-            // extension processing called as well
+            // Do general extension processing
             processExtensions();
 
-            // if we have to few connections now, how do we get more peers?
-            manageConnectivity(); // should this perhaps  be the first one, so we dont need to bother with all other stuff
+            // Maintain connectivity to swarm by sending keep-alive
+            // and connecting to new peers if we have to few connections.
+            // Also drop peers not sending keep-alive.
+            manageConnectivity();
         }
     }
 
@@ -328,10 +370,35 @@ public class Swarm extends Thread {
         return readFrom;
     }
 
-    private LinkedList<Connection> updateChokingState() {
+    /**
+     * Choking algorithm is performed by doing
+     * two independent time contingent updates.
+     * Standard choking management simply unchokes a certain
+     * number of peers which have the greatest seed rate.
+     * Optimistic unchoking unchokes some other random subset
+     * of peers
+     * @return list of presently unchoked connections.
+     */
+    private LinkedList<Connection> chokingAlgorithm() {
 
-        // stop downloading pieces from someone who is just super slow,or who did not respond to our request?
+        // List of presently unchoked connections
+        LinkedList<Connection> unchoked = new LinkedList<Connection>();
 
+        // Get present time to compare against previous unchoking time stamp
+        long presentTime = new Date().getTime();
+
+        // Check if choking state should be updated
+        if(presentTime - lastChokeUpdate.getTime() > CHOKING_MANAGEMENT_PERIODE) {
+
+
+            if(weHaveFullFile())
+
+        }
+
+        // Check if optimistic unchoking should be performed
+        if(presentTime - lastOptimisticChokingUpdate.getTime() > OPTIMISTIC_UNCHOKING_MANAGEMENT_PERIODE) {
+
+        }
     }
 
     private void requestPieces() {
@@ -387,6 +454,15 @@ public class Swarm extends Thread {
 
         // if we have to few connections now, how do we get more peers?
 
+    }
+
+    /**
+     *
+     * @return
+     */
+    boolean weHaveFullFile() {
+        // check that we have metainfo
+        // then check that we hvae it all
     }
 
 

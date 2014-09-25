@@ -46,6 +46,12 @@ public class Connection {
     private PeerState peerState;
 
     /**
+     * Indicates whether this peer is unchoked optimistically,
+     * hence this variable should only be true if peerState.choked is true.
+     */
+    private boolean optimisticallyUnchoked;
+
+    /**
      * Stream used to asynchronously read and write messages
      * to channel.
      */
@@ -56,6 +62,13 @@ public class Connection {
      * to channel.
      */
     private OutputMessageStream outputStream;
+
+    /**
+     * TheShad0W (BitTornado creator) claimed that putting
+     * request messages in same buffer as piece messages
+     * would cause latency high request message latency.
+     */
+    private OutputMessageStream nonPieceOutputStream;
 
     /**
      * Counts the amount of data received in piece messages
@@ -112,6 +125,7 @@ public class Connection {
         this.clientState = clientState;
         this.peerState = peerState;
         this.outputStream = outputStream;
+        this.nonPieceOutputStream = nonPieceOutputStream;
         this.inputStream = inputStream;
         this.validPieceDownloadCounter = 0;
         this.activeClientExtensions = activeClientExtensions;
