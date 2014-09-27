@@ -5,10 +5,7 @@ import java.net.InetSocketAddress;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Set;
+import java.util.*;
 
 import org.bittorrentj.Client;
 import org.bittorrentj.event.ClientIOFailedEvent;
@@ -167,6 +164,11 @@ public class Swarm extends Thread {
     private final int OPTIMISTIC_UNCHOKING_MANAGEMENT_PERIODE = 30*1000;
 
     /**
+     * Used to generate random numbers, in particular for optimistic unchoking.
+     */
+    private Random random;
+
+    /**
      *
      * @param infoHash
      * @param metaInformation
@@ -179,6 +181,8 @@ public class Swarm extends Thread {
         this.metaInformation = metaInformation;
         this.activeClientExtensions = activeClientExtensions;
         this.swarmState = swarmState;
+
+        this.random = new Random();
 
         try {
             this.selector = Selector.open();
@@ -249,7 +253,6 @@ public class Swarm extends Thread {
                             //return;
                             // or just ignore ?
                         }
-
                     }
                 }
             }
@@ -266,7 +269,7 @@ public class Swarm extends Thread {
             // Do general extension processing
             processExtensions();
 
-            // Maintain connectivity to swarm by sending keep-alive
+            // Maintain connectivity to swarm by sending keep-alive,
             // and connecting to new peers if we have to few connections.
             // Also drop peers not sending keep-alive.
             manageConnectivity();
@@ -390,14 +393,105 @@ public class Swarm extends Thread {
         // Check if choking state should be updated
         if(presentTime - lastChokeUpdate.getTime() > CHOKING_MANAGEMENT_PERIODE) {
 
+            // Make a shallow copy just for sorting
+            LinkedList<Connection> copyForSorting = (LinkedList<Connection>)connections.clone();
 
-            if(weHaveFullFile())
+            // If we have all pieces, we unchoke the fastest leechers,
+            // otherwise we unchoke the fastest seeders
+            if(weHaveAllPieces())
+                Collections.sort(copyForSorting, new UploadRateDescendingComparator());
+            else
+                Collections.sort(copyForSorting, new DownloadRateDescendingComparator());
 
+            // Pick top MAX_NUMBER_OF_UNCHOKED_PEERS and send unchoke
+            // message to all that are not choked, and send
+            // choked message to everyone else that are choked.
+            int counter = 0;
+            for(Connection c: copyForSorting) {
+
+                // check if we should try to unchoke
+                if(counter < MAX_NUMBER_OF_UNCHOKED_PEERS) {
+
+                    // if connection is choked, then send unchoke
+                    if(c.getClientState().isChoking())
+                        c.enqueueMessageForSending(new UnChoke());
+
+                } else { // or try to unchoke
+
+                    // if connection is unchoked, then send choke
+                    if(!c.getClientState().isChoking())
+                        c.enqueueMessageForSending(new Choke());
+                }
+
+                counter++;
+            }
         }
 
         // Check if optimistic unchoking should be performed
         if(presentTime - lastOptimisticChokingUpdate.getTime() > OPTIMISTIC_UNCHOKING_MANAGEMENT_PERIODE) {
 
+            // Just find one which is choked and unchoke
+            Connection connection = pickConnectionForOptimisticUnchoking();
+
+            // check that there was at least one, and then send un choke
+            if(connection != null)
+                connection.enqueueMessageForSending(new UnChoke());
+        }
+    }
+
+    /**
+     * Comparator for finding good leechers
+     */
+    class UploadRateDescendingComparator implements Comparator<Connection> {
+
+        /**
+         * Compare upload rate in descending order
+         * @param o1
+         * @param o2
+         * @return
+         */
+        @Override
+        public int compare(Connection o1, Connection o2) {
+            return o1.getUploadRate() - o2.getUploadRate();
+        }
+
+        /**
+         * This equals contract is not identical to Object.equals,
+         * read java api docs.
+         * @param obj
+         * @return
+         */
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof UploadRateDescendingComparator;
+        }
+    }
+
+    /**
+     * Comparator for finding good seeders
+     */
+    class DownloadRateDescendingComparator implements Comparator<Connection> {
+
+        /**
+         * Compare upload rate in descending order
+         * @param o1
+         * @param o2
+         * @return
+         */
+        @Override
+        public int compare(Connection o1, Connection o2) {
+            return o1.getDownloadRate() - o2.getDownloadRate();
+        }
+
+        /**
+         * This equals contract is not identical to Object.equals,
+         * read java api docs.
+         * @param obj
+         * @return
+         */
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof DownloadRateDescendingComparator;
         }
     }
 
@@ -460,7 +554,7 @@ public class Swarm extends Thread {
      *
      * @return
      */
-    boolean weHaveFullFile() {
+    boolean weHaveAllPieces() {
         // check that we have metainfo
         // then check that we hvae it all
     }
@@ -593,4 +687,43 @@ public class Swarm extends Thread {
 
         this.swarmState = swarmState;
     }
+
+    /**
+     * Returns one random presently choked connection.
+     * @return Connection
+     */
+    private Connection pickConnectionForOptimisticUnchoking() {
+
+        // Temporary container for all choked connections
+        ArrayList<Connection> choked = new ArrayList<Connection>();
+
+        // Iterate all connections, and
+        for(Connection c: connections) {
+
+            if(c.getPeerState().isChoking())
+                choked.add(c);
+        }
+
+        // Return null if everything was choked
+        int numberOfChokedConnections = choked.size();
+        if(numberOfChokedConnections == 0)
+            return null;
+        else
+            return choked.get(randInt(0, numberOfChokedConnections - 1));
+    }
+
+    /**
+     * Returns random integer between min and max, both included.
+     * @param min inlcusive lower bound
+     * @param max inclusive upper bound
+     * @return random integer
+     */
+    private int randInt(int min, int max) {
+
+        // nextInt is normally exclusive of the top value,
+        // so add 1 to make it inclusive
+        return random.nextInt((max - min) + 1) + min;
+    }
+
+
 }

@@ -468,4 +468,12 @@ public class Connection {
     public PeerState getClientState() {
         return clientState;
     }
+
+    public int getUploadRate() {
+
+    }
+
+    public int getDownloadRate() {
+
+    }
 }
